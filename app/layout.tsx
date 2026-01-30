@@ -3,7 +3,11 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "bootstrap/dist/css/bootstrap.min.css";
 
-
+export const metadata = {
+  verification: {
+    google: "TYDPejaagQSNZIRilcDbgSHd0CPqM7dxnOK7UpRT8yg",
+  },
+};
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
