@@ -182,7 +182,7 @@ useEffect(() => {
     padding: "60px 20px",
   }}
 >
-      <h1>Free Keyword Ranking Checker</h1>
+     
     
     <div className="container">
       
