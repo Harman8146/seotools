@@ -436,6 +436,25 @@ style={{
     </p>
   </div>
 </section>
+
+       <section>
+          <h2>Frequently Asked Questions</h2>
+
+          <h3>How can I check keyword ranking for free?</h3>
+          <p>You can check keyword ranking for free by using our tool without signup.</p>
+
+          <h3>Is this keyword ranking checker accurate?</h3>
+          <p>Yes, results are based on real Google search data.</p>
+
+          <h3>Which search engine does this ranking checker use?</h3>
+          <p>The tool uses Google search results.</p>
+
+          <h3>Do I need to sign up to use this tool?</h3>
+          <p>No signup or login is required.</p>
+
+          <h3>How often should I check keyword rankings?</h3>
+          <p>Checking weekly is recommended for SEO tracking.</p>
+        </section>
     </div>
     
   </main>
