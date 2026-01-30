@@ -20,6 +20,20 @@ function generateUULE(location: string) {
 }
 
 /* =======================
+   COUNTRY → GL MAP
+======================= */
+const countryToGl: Record<string, string> = {
+  "Canada": "CA",
+  "United States": "US",
+  "USA": "US",
+  "India": "IN",
+  "United Kingdom": "GB",
+  "UK": "GB",
+  "Australia": "AU",
+};
+
+
+/* =======================
    DEVICE CONFIG
 ======================= */
 const devices: any = {
@@ -30,9 +44,15 @@ const devices: any = {
   pixel: { biw: 412, bih: 915, uact: "5" },
 };
 
-/* =======================
-   GOOGLE URL (SAFE AD PREVIEW)
-======================= */
+function detectGlFromLocation(location: string) {
+  for (const country in countryToGl) {
+    if (location.includes(country)) {
+      return countryToGl[country];
+    }
+  }
+  return "US"; // fallback (safe)
+}
+
 function buildGoogleUrl(
   keyword: string,
   location: string,
@@ -40,18 +60,11 @@ function buildGoogleUrl(
   domain: string,
   device: string
 ) {
-  // 🔒 FORCE DESKTOP (important)
+  // 🔒 FORCE DESKTOP (SAFE)
   const d = devices.desktop;
 
-  const glMap: Record<string, string> = {
-    "www.google.com": "US",
-    "www.google.ca": "CA",
-    "www.google.co.in": "IN",
-    "www.google.co.uk": "GB",
-  };
-
-   const gl = glMap[domain] || "US";
-
+  // ✅ GL comes from USER LOCATION
+  const gl = detectGlFromLocation(location);
 
   return (
     `https://${domain}/search` +
@@ -61,12 +74,10 @@ function buildGoogleUrl(
     `&adtest=on` +
     `&pws=0` +
     `&uule=${generateUULE(location)}` +
-    `&num`
-
-   
+    `&num=10`
   );
 }
-  
+
 
 
 
