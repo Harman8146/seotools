@@ -162,6 +162,76 @@ useEffect(() => {
   window.open(url, "_blank", "noopener,noreferrer");
 };
 
+   const faqs = [
+  {
+    q: "How can I check keyword ranking for free?",
+    a: "You can check keyword ranking for free by using our tool without signup."
+  },
+  {
+    q: "Is this keyword ranking checker accurate?",
+    a: "Yes, results are based on real Google search data."
+  },
+  {
+    q: "Which search engine does this ranking checker use?",
+    a: "The tool uses Google search results."
+  },
+  {
+    q: "Do I need to sign up to use this tool?",
+    a: "No signup or login is required."
+  },
+  {
+    q: "How often should I check keyword rankings?",
+    a: "Checking weekly is recommended for SEO tracking."
+  }
+];
+
+   const faqSchema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "How can I check keyword ranking for free?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "You can check keyword ranking for free by entering your website URL and target keyword into our free keyword ranking checker. The tool instantly shows your Google search position without any signup."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is this keyword ranking checker accurate?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, our keyword ranking checker provides accurate results based on real-time Google search data. Rankings may slightly vary depending on location and personalization."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which search engine does this ranking checker use?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "This free ranking checker uses Google search results to determine keyword positions."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need to sign up to use this tool?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No, you do not need to sign up or log in. This keyword ranking checker is completely free to use without registration."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How often should I check keyword rankings?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "You should check keyword rankings weekly to track SEO progress and monitor changes in search engine results."
+      }
+    }
+  ]
+};
+   
  return (
   <>
      
@@ -437,24 +507,33 @@ style={{
   </div>
 </section>
 
-       <section>
-          <h2>Frequently Asked Questions</h2>
+       <section className="max-w-4xl mx-auto mt-16 px-4">
+      <h2 className="text-3xl font-bold text-center mb-8">
+        Frequently Asked Questions
+      </h2>
 
-          <h3>How can I check keyword ranking for free?</h3>
-          <p>You can check keyword ranking for free by using our tool without signup.</p>
+      <div className="space-y-4">
+        {faqs.map((faq, index) => (
+          <details
+            key={index}
+            className="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition"
+          >
+            <summary className="flex justify-between items-center cursor-pointer list-none">
+              <h3 className="text-lg font-semibold">
+                {faq.q}
+              </h3>
+              <span className="text-blue-600 text-xl group-open:rotate-45 transition">
+                +
+              </span>
+            </summary>
 
-          <h3>Is this keyword ranking checker accurate?</h3>
-          <p>Yes, results are based on real Google search data.</p>
-
-          <h3>Which search engine does this ranking checker use?</h3>
-          <p>The tool uses Google search results.</p>
-
-          <h3>Do I need to sign up to use this tool?</h3>
-          <p>No signup or login is required.</p>
-
-          <h3>How often should I check keyword rankings?</h3>
-          <p>Checking weekly is recommended for SEO tracking.</p>
-        </section>
+            <p className="mt-3 text-gray-600 leading-relaxed">
+              {faq.a}
+            </p>
+          </details>
+        ))}
+      </div>
+    </section>
     </div>
     
   </main>
