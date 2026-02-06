@@ -1,46 +1,36 @@
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
-import { HttpsProxyAgent } from "https-proxy-agent";
-
+import { ProxyAgent, fetch } from "undici";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const targetUrl = searchParams.get('url');
-  
-  // Vercel will pull this from the "Environment Variables" you set in the dashboard
-  const auth = process.env.PROXY_AUTH; 
+  const q = searchParams.get("q");
 
-  if (!auth || !targetUrl) {
-    return NextResponse.json({ error: 'Missing configuration' }, { status: 400 });
+  if (!q) {
+    return NextResponse.json({ error: "Missing query" }, { status: 400 });
   }
 
-  try {
-    const proxyUrl = `http://${auth}@p.webshare.io:80`;
-    const agent = new HttpsProxyAgent(proxyUrl);
+  const proxyUrl = `http://${process.env.WEBSHARE_USER}:${process.env.WEBSHARE_PASS}@p.webshare.io:80`;
 
-    const response = await fetch(targetUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      },
-      // Note: In Vercel's Edge/Serverless runtime, fetch behavior can vary. 
-      // This setup works for standard Node.js runtimes.
-    });
+  const agent = new ProxyAgent(proxyUrl);
 
-    let html = await response.text();
+  const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}&num=10`;
 
-    // FIXED: Inject Base Tag so Google styles don't break on your Vercel URL
-    const baseTag = `<head><base href="https://www.google.com">`;
-    html = html.replace('<head>', baseTag);
+  const res = await fetch(googleUrl, {
+    dispatcher: agent,
+    headers: {
+      "user-agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+      "accept-language": "en-US,en;q=0.9",
+    },
+  });
 
-    return new NextResponse(html, {
-      headers: { 
-        'Content-Type': 'text/html',
-        'Cache-Control': 'no-store' 
-      },
-    });
-  } catch (err) {
-    return NextResponse.json({ error: 'Vercel Proxy Error' }, { status: 500 });
-  }
+  const html = await res.text();
+
+  return new NextResponse(html, {
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+    },
+  });
 }
