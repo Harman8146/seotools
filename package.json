@@ -48,3 +48,10 @@
   },
   "homepage": "https://github.com/Harman8146/seotools#readme"
 }
+
+{
+  "scripts": {
+    "dev": "next dev --no-turbo",
+    "build": "next build"
+  }
+}
