@@ -1,622 +1,225 @@
 "use client";
-// import "./globals.css";
-// import "./layout.tsx";
-import { useState, useEffect } from "react";
 
-/* =======================
-   UULE (STABLE)
-======================= */
-function generateUULE(location: string) {
-  const bytes = new TextEncoder().encode(location);
-  const base64 = btoa(String.fromCharCode(...bytes))
-    .replace(/=+$/, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_");
+import { useEffect, useState } from "react";
+import { getUULE, uuleArray, getGL } from "../src/lib/uule";
 
-  const KEY =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
-
-  return `w+CAIQICI${KEY[bytes.length]}${base64}`;
-}
-
-/* =======================
-   COUNTRY → GL MAP
-======================= */
-const countryToGl: Record<string, string> = {
-  "Canada": "CA",
-  "United States": "US",
-  "USA": "US",
-  "India": "IN",
-  "United Kingdom": "GB",
-  "UK": "GB",
-  "Australia": "AU",
-};
-
-
-/* =======================
-   DEVICE CONFIG
-======================= */
-const devices: any = {
-  desktop: { biw: 1366, bih: 768, uact: "" },
-  mobile: { biw: 390, bih: 844, uact: "5" },
-  tablet: { biw: 768, bih: 1024, uact: "" },
-  iphone: { biw: 375, bih: 812, uact: "5" },
-  pixel: { biw: 412, bih: 915, uact: "5" },
-};
-
-function detectGlFromLocation(location: string) {
-  for (const country in countryToGl) {
-    if (location.includes(country)) {
-      return countryToGl[country];
-    }
-  }
-  return "US"; // fallback (safe)
-}
-
-function buildGoogleUrl(
-  keyword: string,
-  location: string,
-  lang: string,
-  domain: string,
-  device: string
-) {
-  // 🔒 FORCE DESKTOP (SAFE)
-  const d = devices.desktop;
-
-  // ✅ GL comes from USER LOCATION
-  const gl = detectGlFromLocation(location);
-
-  return (
-    `https://${domain}/search` +
-    `?q=${encodeURIComponent(keyword)}` +
-    `&gl=${gl}` +
-    `&hl=${lang}` +
-    `&adtest=on` +
-    `&pws=0` +
-    `&uule=${generateUULE(location)}` +
-    `&num=10`
-  );
-}
-
-
-
-
-
-/* =======================
-   PAGE
-======================= */
 export default function Home() {
   const [dark, setDark] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [query, setQuery] = useState("");
-  const [location, setLocation] = useState("");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [locationSelected, setLocationSelected] = useState(false);
   const [language, setLanguage] = useState("en");
   const [domain, setDomain] = useState("www.google.com");
-  const [device, setDevice] = useState("desktop");
- 
-
-  const GEONAMES_USER = "test02888";
-
-  /* Dark mode */
-  useEffect(() => {
-    const saved = localStorage.getItem("darkMode");
-    if (saved === "true") setDark(true);
-  }, []);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [locationSelected, setLocationSelected] = useState(false);
+  const [pickedLocation, setPickedLocation] = useState<{
+    city: string;
+    countryCode: string;
+    state: string;
+  } | null>(null);
 
   useEffect(() => {
-    localStorage.setItem("darkMode", String(dark));
+    document.body.style.background = dark
+      ? "#020617"
+      : "#f8fafc";
   }, [dark]);
 
-  /* GeoNames (LOCKED AFTER SELECT) */
-  useEffect(() => {
-    if (locationSelected) return;
-    if (query.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-
-    const controller = new AbortController();
-    const t = setTimeout(() => {
-      fetch(
-        `https://secure.geonames.org/searchJSON?q=${query}&maxRows=6&username=${GEONAMES_USER}`,
-        { signal: controller.signal }
-      )
-        .then((r) => r.json())
-        .then((d) => d.geonames && setSuggestions(d.geonames))
-        .catch(() => {});
-    }, 300);
-
-    return () => {
-      clearTimeout(t);
-      controller.abort();
-    };
-  }, [query, locationSelected]);
-
-  const selectCity = (c: any) => {
-    const loc = `${c.name}, ${c.adminName1}, ${c.countryName}`;
-    setLocation(loc);
-    setQuery(loc);
-    setSuggestions([]);
-    setLocationSelected(true);
-  };
+/* =======================
+    LOCAL SUGGESTIONS
+======================= */
 useEffect(() => {
-  document.body.classList.toggle("dark", dark);
-}, [dark]);
-
-  const run = () => {
-  if (!keyword || !location) {
-    alert("Keyword and location required");
+  // If the user hasn't typed enough or already selected a city, clear suggestions
+  if (locationSelected || query.length < 2) {
+    setSuggestions([]);
     return;
   }
 
-  const url = buildGoogleUrl(
-    keyword,
-    location,
-    language,
-    domain,
-    device
-  );
+  // Filter your local uule.json array based on the user's input
+  const results = uuleArray
+    .filter((item) => 
+      item.city.toLowerCase().startsWith(query.toLowerCase()) ||
+      (item.state && item.state.toLowerCase().startsWith(query.toLowerCase()))
+    )
+    .slice(0, 5); // Limit to top 5 matches for UI clarity
 
-  window.open(url, "_blank", "noopener,noreferrer");
+  setSuggestions(results);
+}, [query, locationSelected]);
+
+  const selectCity = (item: any) => {
+  setPickedLocation({
+    city: item.city,
+    countryCode: item.countryCode,
+    state: item.state || ""
+  });
+
+  // Display the City and State from your JSON in the input field
+  setQuery(`${item.city}${item.state ? `, ${item.state}` : ""}, ${item.countryCode}`);
+  setSuggestions([]);
+  setLocationSelected(true);
 };
 
-   const faqs = [
-  {
-    q: "How can I check keyword ranking for free?",
-    a: "You can check keyword ranking for free by using our tool without signup."
-  },
-  {
-    q: "Is this keyword ranking checker accurate?",
-    a: "Yes, results are based on real Google search data."
-  },
-  {
-    q: "Which search engine does this ranking checker use?",
-    a: "The tool uses Google search results."
-  },
-  {
-    q: "Do I need to sign up to use this tool?",
-    a: "No signup or login is required."
-  },
-  {
-    q: "How often should I check keyword rankings?",
-    a: "Checking weekly is recommended for SEO tracking."
-  }
-];
-
-   const faqSchema = {
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "How can I check keyword ranking for free?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "You can check keyword ranking for free by entering your website URL and target keyword into our free keyword ranking checker. The tool instantly shows your Google search position without any signup."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Is this keyword ranking checker accurate?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes, our keyword ranking checker provides accurate results based on real-time Google search data. Rankings may slightly vary depending on location and personalization."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Which search engine does this ranking checker use?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "This free ranking checker uses Google search results to determine keyword positions."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "Do I need to sign up to use this tool?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "No, you do not need to sign up or log in. This keyword ranking checker is completely free to use without registration."
-      }
-    },
-    {
-      "@type": "Question",
-      "name": "How often should I check keyword rankings?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "You should check keyword rankings weekly to track SEO progress and monitor changes in search engine results."
-      }
+  const run = (pageNumber: number = 1) => {
+    if (!keyword || !pickedLocation) {
+      alert("Please enter a keyword and select a location.");
+      return;
     }
-  ]
-};
-   
- return (
-  <>
-     
-  <div
-  style={{
-    position: "absolute",
-    inset: 0,
-    zIndex: 0,
-    background:
-      "radial-gradient(circle at 20% 20%, rgba(37,99,235,0.15), transparent 40%), radial-gradient(circle at 80% 30%, rgba(99,102,241,0.15), transparent 40%)",
-  }}
-/>
-
-  <main
-  className="min-vh-100 d-flex align-items-center justify-content-center"
-  style={{
-    background: "transparent",
-    padding: "60px 20px",
-  }}
->
-     
+    const uule = getUULE(pickedLocation.city, pickedLocation.countryCode, pickedLocation.state);
+    const gl = getGL(pickedLocation.countryCode);
+    const startIndex = (pageNumber - 1) * 10;
     
-    <div className="container">
-      
-      <div className="row justify-content-center">
-        <div className="col-lg-8 col-xl-7">
-          <div className={`card shadow-lg border-0 ${dark ? "bg-black text-light" : ""}`}>
-            <div
-  className="card-body p-4 p-md-5"
-  style={{
-    background: dark
-      ? "rgba(255,255,255,0.02)"
-      : "rgba(255,255,255,0.6)",
-    backdropFilter: "blur(14px)",
-  }}
->
+    const googleUrl = `https://${domain}/search?q=${encodeURIComponent(keyword)}&gl=${gl}&hl=${language}&adtest=on&pws=0&uule=${uule}&num=10${pageNumber > 1 ? `&start=${startIndex}` : ""}`;
+    window.open(googleUrl, "_blank", "noopener,noreferrer");
+  };
 
-
-
-
-              {/* HEADER */}
-             <div
-  className="px-4 px-md-5 py-4"
-  style={{
-    background: dark
-      ? "linear-gradient(135deg, #020617, #020617)"
-      : "linear-gradient(135deg, #2563eb, #1d4ed8)",
-    color: "#fff",
-  }}
->
-  <div className="d-flex justify-content-between align-items-center">
-    <h1 className="fw-bold mb-0" style={{ fontSize: "1.9rem" }}>
-      Google SERP Preview Tool
-    </h1>
-
-    <button
-      className="btn btn-sm btn-light"
-      onClick={() => setDark(!dark)}
-      style={{ borderRadius: "20px" }}
-    >
-      {dark ? "☀ Light" : "🌙 Dark"}
-    </button>
-  </div>
-
-  <p className="mt-2 mb-0 opacity-75">
-    Preview Google search results by keyword, location, language & domain.
-  </p>
+  return (
+    <>
+    {/* TOP HEADER DISCLAIMER - FULL WIDTH */}
+<div className="w-100 py-2 px-3 text-center mb-4" 
+     style={{ 
+       background: dark ? "#450a0a" : "#fee2e2", 
+       borderBottom: `1px solid ${dark ? "#991b1b" : "#fecaca"}`,
+       fontSize: "0.85rem" 
+     }}>
+  <span className="fw-bold text-danger">⚠️ Pro-Tip:</span> 
+  {" "}If you see a <strong>403 Error</strong>, please close the tab and reopen it. 
+  For best results, use a <strong>Private or Incognito tab</strong> to ensure non-personalized results.
 </div>
 
-<br />
-              {/* INTRO */}
-              <p className="text-secondary med mb-4">
-                This tool lets you preview Google search results for a specific
-                <strong> keyword, location, language, and Google domain </strong>
-                using Google’s official. It simulates how ads and organic results may appear in different
-                cities.
-              </p>
+    <main className={`container-fluid py-5 ${dark ? "text-light" : "text-dark"}`}>
 
-              {/* SEARCH QUERY */}
-              <div className="mb-3">
-                <label className={`form-label fw-semibold ${dark ? "text-info" : "text-primary"}`}>
-Search Keyword</label>
-                <input
-                  className="form-control"
-                  placeholder="e.g. seo services near me"
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                />
-                <div className="form-text">
-                  Enter the exact keyword you want to preview on Google.
-                </div>
-              </div>
+      <div className="container" style={{ maxWidth: "800px" }}>
 
-              {/* LOCATION */}
-              <div className="mb-3 position-relative">
-                <label className={`form-label fw-semibold ${dark ? "text-info" : "text-primary"}`}>
-Target Location</label>
-                <input
-                  className="form-control"
-                  placeholder="Start typing city name..."
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    setLocationSelected(false);
-                  }}
-                />
+        
+        
+        {/* HEADER SECTION (SEO H1) */}
+        <header className="text-center mb-5">
+          <h1 className="display-5 fw-bold mb-3">Google Local SERP Checker Tool</h1>
+          <p className="lead opacity-75">
+            Simulate Google search results from any city in the world.
+          </p>
+          <button className="btn btn-sm btn-outline-primary" onClick={() => setDark(!dark)}>
+            Switch to {dark ? "Light" : "Dark"} Mode
+          </button>
+        </header>
 
-                {suggestions.length > 0 && (
-                  <div className={`list-group position-absolute w-100 shadow ${dark ? "bg-dark" : ""}`} style={{ zIndex: 10 }}>
-                    {suggestions.map((c) => (
-                      <button
-                        key={c.geonameId}
-                        className={`list-group-item list-group-item-action ${dark ? "bg-black text-light" : ""}`}
-                        onClick={() => selectCity(c)}
-                      >
-                        {c.name}, {c.adminName1}, {c.countryName}
-                      </button>
-                    ))}
-                  </div>
-                )}
+        {/* TOOL SECTION */}
+        <div className={`card shadow-sm border-0 mb-5 ${dark ? "bg-slate-900 text-white" : "bg-white"}`} 
+             style={{ borderRadius: "20px", background: dark ? "#0f172a" : "#ffffff" }}>
+          <div className="card-body p-4 p-md-5">
+            <div className="mb-4">
+              <label className="form-label fw-bold small">SEARCH QUERY</label>
+              <input className="form-control form-control-lg" placeholder="Enter keyword (e.g. Flower Delivery)" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+            </div>
 
-                
-              </div>
+            <div className="mb-4 position-relative">
+              <label className="form-label fw-bold small">GEO-LOCATION (CITY, STATE)</label>
+              <input className="form-control form-control-lg" placeholder="Start typing a city..." value={query} onChange={(e) => { setQuery(e.target.value); setLocationSelected(false); }} />
+            {suggestions.length > 0 && (
+  <div 
+    className="list-group position-absolute w-100 shadow-lg mt-1 z-3"
+    style={{ 
+      maxHeight: "250px", // Limits height to about 4-5 items
+      overflowY: "auto",  // Enables vertical scrolling
+      borderRadius: "12px",
+      border: "1px solid rgba(0,0,0,0.1)"
+    }}
+  >
+    {suggestions.map((s) => (
+      <button 
+        key={s.uule} // Unique key fix
+        className="list-group-item list-group-item-action py-3 d-flex justify-content-between align-items-center" 
+        onClick={() => selectCity(s)}
+      >
+        <div>
+          <strong className="d-block">{s.city}</strong>
+          <span className="small opacity-75">{s.state}, {s.countryCode}</span>
+        </div>
+        <span className="badge rounded-pill bg-light text-dark border small">Local</span>
+      </button>
+    ))}
+  </div>
+)}
 
-              {/* DEVICE */}
-              <div className="mb-3">
-               <label className={`form-label fw-semibold ${dark ? "text-info" : "text-primary"}`}>
-Device Type</label>
-                <select
-                  className="form-select"
-                  value={device}
-                  onChange={(e) => setDevice(e.target.value)}
-                >
-                  <option value="desktop">Desktop (Recommended)</option>
-                </select>
-                <div className="form-text">
-                  Desktop mode ensures stable and accurate ad preview results.
-                </div>
-              </div>
+            </div>
 
-              {/* DOMAIN */}
-              <div className="mb-3">
-               <label className={`form-label fw-semibold ${dark ? "text-info" : "text-primary"}`}>
-Google Domain</label>
-                <select
-                  className="form-select"
-                  value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
-                >
-                  <option value="www.google.com">Google.com (Global)</option>
-                  <option value="www.google.co.in">Google.co.in (India)</option>
+            <div className="row g-3 mb-4">
+              <div className="col-md-6">
+                <label className="form-label fw-bold small">GOOGLE DOMAIN</label>
+                <select className="form-select" value={domain} onChange={(e) => setDomain(e.target.value)}>
+                  <option value="www.google.com">Google.com</option>
+                  <option value="www.google.co.uk">Google.co.uk (United Kingdom)</option>
                   <option value="www.google.ca">Google.ca (Canada)</option>
-                  <option value="www.google.co.uk">Google.co.uk (UK)</option>
                 </select>
               </div>
-
-              {/* LANGUAGE */}
-              <div className="mb-4">
-                <label className={`form-label fw-semibold ${dark ? "text-info" : "text-primary"}`}>
-Language</label>
-                <select
-                  className="form-select"
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
-                >
+              <div className="col-md-6">
+                <label className="form-label fw-bold small">LANGUAGE</label>
+                <select className="form-select" value={language} onChange={(e) => setLanguage(e.target.value)}>
                   <option value="en">English</option>
-                  <option value="hi">Hindi</option>
+                  <option value="es">Spanish</option>
                   <option value="fr">French</option>
                 </select>
               </div>
-
-              {/* CTA */}
-              <button
-                className="btn w-100 fw-bold py-3"
-style={{
-  background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
-  borderRadius: "14px",
-  color: "#fff",
-  fontSize: "1.05rem",
-}}
-
-                onClick={run}
-              >
-                🔍 Preview Google SERP
-              </button>
-
-              {/* FOOTER INFO */}
-              <div className="mt-4 text-center small">
-  <div className="d-flex justify-content-center gap-3 flex-wrap">
-    <span className="badge bg-success bg-opacity-10 text-success px-3 py-2">
-      ✔ Official Google UULE
-    </span>
-    <span className="badge bg-info bg-opacity-10 text-info px-3 py-2">
-      ✔ No VPN / Proxy
-    </span>
-    <span className="badge bg-primary bg-opacity-10 text-primary px-3 py-2">
-      ✔ Best for Local SEO
-    </span>
-  </div>
-</div>
             </div>
+
+            <div className="d-grid gap-2">
+              <button className="btn btn-primary btn-lg fw-bold py-3" onClick={() => run(1)}>🔍 Preview SERP Page </button>
+              <div className="d-flex gap-2">
+              
+              </div>
+            </div>
+            
           </div>
         </div>
-      </div>
-                <br />
-                <br />
 
-       {/* INTERACTIVE CONTENT SECTION */}
-<section
-  className="p-5 rounded-4 mt-5 position-relative overflow-hidden"
-  style={{
-    background: "linear-gradient(135deg, #eef2ff, #f8f9fa)",
-    transition: "all 0.3s ease",
-  }}
->
-  {/* floating background effect */}
-  <div
-    style={{
-      position: "absolute",
-      top: "-40px",
-      right: "-40px",
-      width: "200px",
-      height: "200px",
-      background: "radial-gradient(circle, rgba(13,110,253,0.15), transparent)",
-      borderRadius: "50%",
-    }}
-  />
+      {/* --- SEO EDUCATIONAL CONTENT --- */}
+        <section className="mt-5 border-top pt-5">
+          <div className="row g-5">
+            <div className="col-md-6">
+              <h2 className="h4 fw-bold mb-3">How does local search simulation work?</h2>
+              <p className="opacity-75">
+                Our tool utilizes specialized search parameters to inform search engines of a specific 
+                geographic intent. Unlike standard searches that rely on your IP address, 
+                this method forces the search engine to display results based on the coordinates 
+                of your chosen city.
+              </p>
+            </div>
+            <div className="col-md-6">
+              <h2 className="h4 fw-bold mb-3">Benefits for SEO Professionals</h2>
+              <ul className="opacity-75 ps-3">
+                <li className="mb-2"><strong>Unbiased Data:</strong> Remove the influence of your personal search history.</li>
+                <li className="mb-2"><strong>Ad Verification:</strong> Check if localized PPC ads are triggering correctly.</li>
+                <li><strong>GMB Monitoring:</strong> Track local map pack rankings for remote clients.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
 
-  <h2 className="fw-bold text-primary mb-4 display-6">
-    Why Use a Google SERP Preview Tool?
-  </h2>
-
-  <p className="fs-5 text-dark lh-lg">
-    A <strong className="text-primary">Google SERP preview tool</strong> allows
-    website owners, SEO professionals, bloggers, and digital marketers to
-    visualize how their pages will appear in{" "}
-    <strong>Google search results</strong> before publishing. This ensures your
-    title and meta description are readable, optimized, and designed to attract
-    clicks.
-  </p>
-
-  <p className="fs-5 text-dark lh-lg">
-    Google may automatically truncate titles and descriptions that exceed the
-    recommended pixel limits. Using a SERP preview tool helps you avoid this
-    problem and craft snippets that communicate value clearly while increasing
-    <span className="text-danger fw-semibold"> click-through rates</span>.
-  </p>
-
-  <p className="fs-5 text-dark lh-lg">
-    Even high-ranking pages can underperform if their metadata is poorly
-    written. Optimized snippets improve trust, relevance, and visibility,
-    helping you gain more{" "}
-    <strong className="text-success">organic traffic</strong> without changing
-    your rankings.
-  </p>
-
-  <p className="fs-5 text-dark lh-lg">
-    By previewing and refining metadata before publishing, you save time,
-    reduce guesswork, and improve overall SEO performance. This makes SERP
-    preview tools an essential part of any professional SEO workflow.
-  </p>
-
-  {/* INTERACTIVE INFO BOX */}
-  <div
-    className="mt-5 p-4 rounded-3 border-start border-5 border-primary bg-white shadow-sm"
-    style={{ transition: "transform 0.3s ease" }}
-  >
-    <p className="fs-5 mb-0 text-dark">
-      💡 <strong>Pro Tip:</strong> Always test multiple title and description
-      variations. Small wording changes can significantly improve CTR and user
-      engagement.
-    </p>
-  </div>
-</section>
-
-       <section className="max-w-4xl mx-auto mt-16 px-4">
-      <h2 className="text-3xl font-bold text-center mb-8">
-        Frequently Asked Questions
-      </h2>
-
-      <div className="space-y-4">
-        {faqs.map((faq, index) => (
-          <details
-            key={index}
-            className="group bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition"
-          >
-            <summary className="flex justify-between items-center cursor-pointer list-none">
-              <h3 className="text-lg font-semibold">
-                {faq.q}
-              </h3>
-              <span className="text-blue-600 text-xl group-open:rotate-45 transition">
-                +
-              </span>
-            </summary>
-
-            <p className="mt-3 text-gray-600 leading-relaxed">
-              {faq.a}
-            </p>
-          </details>
-        ))}
-      </div>
-    </section>
+      <footer className="mt-5 pt-5 border-top">
+  <div className="row g-4 align-items-center">
+    <div className="col-md-6 text-center text-md-start">
+      <p className="small opacity-75 mb-0">
+        &copy; {new Date().getFullYear()} Local Search Simulator. All rights reserved.
+      </p>
     </div>
-    
-  </main>
-  </>
-);
-
+    <div className="col-md-6 text-center text-md-end">
+      <nav className="d-flex justify-content-center justify-content-md-end gap-3 small">
+        <a href="/privacy" className="text-decoration-none opacity-75 hover-opacity-100">Privacy Policy</a>
+        <a href="/terms" className="text-decoration-none opacity-75 hover-opacity-100">Terms & Conditions</a>
+        <a href="/about" className="text-decoration-none opacity-75 hover-opacity-100">How UULE Works</a>
+      </nav>
+    </div>
+  </div>
+  
+  <div className="row mt-4">
+    <div className="col-12 text-center small opacity-50">
+      <p style={{ fontSize: '0.75rem' }}>
+        <strong>SEO Note:</strong> This tool is designed for research purposes. It simulates localized search 
+        environments using mathematical UULE parameters to bypass IP-based personalization.
+      </p>
+    </div>
+  </div>
+</footer>
+      </div>
+    </main>
+    </>
+  );
 }
-
-/* =======================
-   STYLES
-======================= */
-const page = (d: boolean) => ({
-  minHeight: "100vh",
-  background: d ? "#0f172a" : "#f4f6f8",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  padding: 20,
-});
-
-const heading = { fontSize: 28 };
-
-const card = (d: boolean) => ({
-  width: "100%",
-  maxWidth: 760,
-  background: d ? "#020617" : "#fff",
-  color: d ? "#e5e7eb" : "#000",
-  padding: 30,
-  borderRadius: 12,
-  boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-});
-
-const header = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-};
-
-const toggle = {
-  padding: "6px 10px",
-  borderRadius: 6,
-  border: "1px solid #555",
-  cursor: "pointer",
-};
-
-const sub = (d: boolean) => ({
-  color: d ? "#94a3b8" : "#555",
-  marginBottom: 16,
-});
-
-const label = { fontSize: 16, marginTop: 14 };
-
-const input = (d: boolean) => ({
-  width: "100%",
-  padding: 12,
-  borderRadius: 6,
-  border: "1px solid #555",
-  background: d ? "#020617" : "#fff",
-  color: d ? "#fff" : "#000",
-});
-
-const dropdown = (d: boolean) => ({
-  position: "absolute" as const,
-  width: "100%",
-  background: d ? "#020617" : "#fff",
-  border: "1px solid #555",
-  zIndex: 20,
-});
-
-const option = (d: boolean) => ({
-  padding: 10,
-  cursor: "pointer",
-  borderBottom: "1px solid #444",
-  background: d ? "#020617" : "#fff",
-});
-
-const button = {
-  width: "100%",
-  marginTop: 20,
-  padding: 14,
-  background: "#2563eb",
-  color: "#fff",
-  fontWeight: 700,
-  borderRadius: 8,
-  cursor: "pointer",
-};
