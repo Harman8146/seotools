@@ -1,8 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getUULE, uuleArray, getGL } from "../src/lib/uule";
+<<<<<<< HEAD
+// import { getUULE, uuleArray, getGL } from "../src/lib/uule";
+// import { getUULE, uuleArray, getGL } from "@/src/lib/uule";
+
+const searchCache = new Map<string, number>();
+const CACHE_TIME = 15 * 60 * 1000; // 15 min
+
+
 let GLOBAL_UULE_DATA: any[] = [];
+
+const MIN_DELAY = 8000;
+const MAX_DELAY = 15000;
+const MAX_PAGES_PER_SESSION = 12;
+const BLOCK_COOLDOWN = 10 * 60 * 1000; // 10 min
+
+let lastRequestTime = 0;
+let sessionPageCount = 0;
+let blockedUntil = 0;
+
+const sleep = (ms: number) =>
+  new Promise(resolve => setTimeout(resolve, ms));
+
+let sessionPageCount = 0;
+let blockedUntil = 0;
+
+const MIN_DELAY = 9000;
+const MAX_DELAY = 16000;
 
 export default function Home() {
   // 1. Define your states (Make sure the names match!)
@@ -18,6 +43,37 @@ const [pickedLocation, setPickedLocation] = useState<{
   countryCode: string;
   state: string;
 } | null>(null);
+ const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<string[]>([]);
+
+let lastRequestTime = 0;
+
+
+const MAX_PAGES_PER_SESSION = 80;
+const BLOCK_COOLDOWN = 25 * 60 * 1000; // 25 min
+
+
+
+  async function search() {
+    setLoading(true);
+    setResults([]);
+
+    const res = await fetch(`/api/search?q=seo+tool&page=0`);
+
+    const data = await res.json();
+if (data.googleUrl) {
+  window.open(data.googleUrl, "_blank", "noopener,noreferrer");
+}
+    // if (data.blocked) {
+    //   alert("Google blocked server request. Opening manually.");
+    //   window.open(data.googleUrl, "_blank");
+    //   setLoading(false);
+    //   return;
+    // }
+
+    setResults(data.results || []);
+    setLoading(false);
+  }
 
 // We will use "isDataLoaded" to stay consistent with the logic below
 const [uuleData, setUuleData] = useState<any[]>([]);
@@ -45,6 +101,23 @@ useEffect(() => {
 
 
   
+=======
+import { getUULE, uuleArray, getGL } from "../src/lib/uule";
+
+export default function Home() {
+  const [dark, setDark] = useState(false);
+  const [keyword, setKeyword] = useState("");
+  const [query, setQuery] = useState("");
+  const [language, setLanguage] = useState("en");
+  const [domain, setDomain] = useState("www.google.com");
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [locationSelected, setLocationSelected] = useState(false);
+  const [pickedLocation, setPickedLocation] = useState<{
+    city: string;
+    countryCode: string;
+    state: string;
+  } | null>(null);
+>>>>>>> 664eb35 (Saving my local changes before pulling)
 
   useEffect(() => {
     document.body.style.background = dark
@@ -53,6 +126,7 @@ useEffect(() => {
   }, [dark]);
 
 /* =======================
+<<<<<<< HEAD
     LOCAL SUGGESTIONS (FIXED)
 ======================= */
 useEffect(() => {
@@ -97,6 +171,193 @@ useEffect(() => {
   setLocationSelected(true);
 };
 
+const sleep = (ms: number) =>
+  new Promise(resolve => setTimeout(resolve, ms));
+
+
+// const run = async (pageNumber: number = 1) => {
+//   if (!keyword || !pickedLocation) return;
+
+//   const now = Date.now();
+
+//   // 🧊 COOLDOWN AFTER BLOCK
+//   if (now < blockedUntil) {
+//     console.warn("Cooling down after block");
+//     return;
+//   }
+
+//   // 🛑 SESSION LIMIT
+//   if (sessionPageCount >= MAX_PAGES_PER_SESSION) {
+//     console.warn("Session page limit reached");
+//     return;
+//   }
+
+//   // ⏱️ HUMAN WAIT (REAL WAIT)
+//   const delay =
+//     Math.floor(Math.random() * (MAX_DELAY - MIN_DELAY)) + MIN_DELAY;
+
+//   await sleep(delay);
+
+//   sessionPageCount++;
+
+//   // 🔁 HIT SERVER ONLY EVERY 2 PAGES
+//   if (pageNumber % 2 !== 0) {
+//     openGoogle(pageNumber);
+//     return;
+//   }
+
+//   const res = await fetch(
+//     `/api/search?q=${encodeURIComponent(keyword)}&city=${pickedLocation.city}&state=${pickedLocation.state}&country=${pickedLocation.countryCode}&page=${pageNumber}`,
+//     {
+//       credentials: "omit",
+//     }
+//   );
+
+//   // 🚫 BLOCKED
+//   if (!res.ok) {
+//     blockedUntil = Date.now() + BLOCK_COOLDOWN;
+//     openGoogle(pageNumber);
+//     return;
+//   }
+
+//   await res.json();
+// };
+
+
+// const openGoogle = (pageNumber: number) => {
+//   const uule = getUULE(
+//     pickedLocation!.city,
+//     pickedLocation!.countryCode,
+//     pickedLocation!.state
+//   );
+
+//   const gl = getGL(pickedLocation!.countryCode);
+//   const startIndex = (pageNumber - 1) * 10;
+
+//   const googleUrl = `https://${domain}/search?q=${encodeURIComponent(
+//     keyword
+//   )}&gl=${gl}&hl=${language}&adtest=on&pws=0&uule=${uule}&num=10${
+//     pageNumber > 1 ? `&start=${startIndex}` : ""
+//   }`;
+
+//   window.open(googleUrl, "_blank", "noopener,noreferrer");
+// };
+
+
+const openGoogle = (pageNumber: number) => {
+  if (!pickedLocation) return;
+
+  const uule = getUULE(
+    pickedLocation.city,
+    pickedLocation.countryCode,
+    pickedLocation.state
+  );
+
+  const gl = getGL(pickedLocation.countryCode);
+  const hl = language;
+  const startIndex = (pageNumber - 1) * 10;
+
+  const googleUrl = `https://${domain}/search?q=${encodeURIComponent(
+    keyword
+  )}&gl=${gl}&hl=${hl}&adtest=on&pws=0&uule=${uule}&num=10${
+    pageNumber > 1 ? `&start=${startIndex}` : ""
+  }`;
+
+  window.open(googleUrl, "_blank", "noopener,noreferrer");
+};
+
+
+const run = async (pageNumber: number = 1) => {
+  if (!keyword || !pickedLocation) return;
+
+  const cacheKey = `${keyword}-${pickedLocation.city}-${pageNumber}`;
+const now = Date.now();
+
+if (searchCache.has(cacheKey)) {
+  if (now - searchCache.get(cacheKey)! < CACHE_TIME) {
+    openGoogle(pageNumber);
+    return;
+  }
+}
+
+searchCache.set(cacheKey, now);
+
+  
+
+  // 🧊 cooldown after block
+  if (now < blockedUntil) {
+    console.warn("Cooling down...");
+    return;
+  }
+
+  // 🛑 per-session limit
+  if (sessionPageCount >= MAX_PAGES_PER_SESSION) {
+    console.warn("Session limit reached");
+    return;
+  }
+
+  // ⏱️ human delay
+  const delay =
+    Math.floor(Math.random() * (MAX_DELAY - MIN_DELAY)) + MIN_DELAY;
+
+  await sleep(delay);
+
+  sessionPageCount++;
+
+  // 🔁 OPEN GOOGLE directly on odd pages
+  if (pageNumber % 2 !== 0) {
+    openGoogle(pageNumber);
+    return;
+  }
+
+  // 🔐 server call (even pages only)
+  const res = await fetch(
+    `/api/search?q=${encodeURIComponent(keyword)}&city=${pickedLocation.city}&state=${pickedLocation.state}&country=${pickedLocation.countryCode}&page=${pageNumber}`,
+    { credentials: "omit" }
+  );
+
+  if (!res.ok) {
+    blockedUntil = Date.now() + BLOCK_COOLDOWN;
+    openGoogle(pageNumber);
+    return;
+  }
+
+  await res.json();
+};
+=======
+    LOCAL SUGGESTIONS
+======================= */
+useEffect(() => {
+  // If the user hasn't typed enough or already selected a city, clear suggestions
+  if (locationSelected || query.length < 2) {
+    setSuggestions([]);
+    return;
+  }
+
+  // Filter your local uule.json array based on the user's input
+  const results = uuleArray
+    .filter((item) => 
+      item.city.toLowerCase().startsWith(query.toLowerCase()) ||
+      (item.state && item.state.toLowerCase().startsWith(query.toLowerCase()))
+    )
+    // .slice(0, 5); // Limit to top 5 matches for UI clarity
+
+  setSuggestions(results);
+}, [query, locationSelected]);
+
+  const selectCity = (item: any) => {
+  setPickedLocation({
+    city: item.city,
+    countryCode: item.countryCode,
+    state: item.state || ""
+  });
+
+  // Display the City and State from your JSON in the input field
+  setQuery(`${item.city}${item.state ? `, ${item.state}` : ""}, ${item.countryCode}`);
+  setSuggestions([]);
+  setLocationSelected(true);
+};
+
   const run = (pageNumber: number = 1) => {
     if (!keyword || !pickedLocation) {
       alert("Please enter a keyword and select a location.");
@@ -109,7 +370,28 @@ useEffect(() => {
     const googleUrl = `https://${domain}/search?q=${encodeURIComponent(keyword)}&gl=${gl}&hl=${language}&adtest=on&pws=0&uule=${uule}&num=10${pageNumber > 1 ? `&start=${startIndex}` : ""}`;
     window.open(googleUrl, "_blank", "noopener,noreferrer");
   };
+>>>>>>> 664eb35 (Saving my local changes before pulling)
 
+  return (
+    <>
+    {/* TOP HEADER DISCLAIMER - FULL WIDTH
+<div className="w-100 py-2 px-3 text-center mb-4 " 
+
+     style={{ 
+       background: dark ? "#450a0a" : "#fffcfc", 
+       borderBottom: `1px solid ${dark ? "#991b1b" : "#ffffff"}`,
+       
+       fontSize: "0.85rem", 
+       
+     }}>
+  <span className="fw-bold text-danger ">⚠️ Pro-Tip:</span> 
+  {" "}If you see a <strong>403 Error</strong>, please close the tab and reopen it. 
+  For best results, use a <strong>Private or Incognito tab</strong> to ensure non-personalized results.
+</div> */}
+
+    <main className={`container-fluid py-5 ${dark ? "text-light" : "text-dark"}`}>
+
+<<<<<<< HEAD
   return (
     <>
     {/* TOP HEADER DISCLAIMER - FULL WIDTH */}
@@ -128,6 +410,10 @@ useEffect(() => {
 
       <div className="container" style={{ maxWidth: "800px" }}>
 
+=======
+      <div className="container" style={{ maxWidth: "800px" }}>
+
+>>>>>>> 664eb35 (Saving my local changes before pulling)
         
         
         {/* HEADER SECTION (SEO H1) */}
@@ -181,6 +467,19 @@ useEffect(() => {
 
             </div>
 
+<<<<<<< HEAD
+             <button onClick={search} disabled={loading}>
+        {loading ? "Searching..." : "Search"}
+      </button>
+
+      <ul>
+        {results.map((r, i) => (
+          <li key={i}>{r}</li>
+        ))}
+      </ul>
+
+=======
+>>>>>>> 664eb35 (Saving my local changes before pulling)
             <div className="row g-3 mb-4">
               <div className="col-md-6">
                 <label className="form-label fw-bold small">GOOGLE DOMAIN</label>
@@ -233,8 +532,12 @@ useEffect(() => {
           </div>
         </section>
 
+<<<<<<< HEAD
 
  <section className="mb-10">
+=======
+        <section className="mb-10">
+>>>>>>> 664eb35 (Saving my local changes before pulling)
         <p className="mb-6 text-lg">
           If you need to check Google search results from a different city or country, you’re in the right place. 
           We built this <strong>Google Search Simulator</strong> to provide SEO professionals and business owners 
@@ -295,7 +598,11 @@ useEffect(() => {
       <footer className="mt-5 pt-5 border-top">
   <div className="row g-4 align-items-center">
     <div className="col-md-6 text-center text-md-start">
+<<<<<<< HEAD
       <p className="small mb-0">
+=======
+      <p className="small opacity-75 mb-0">
+>>>>>>> 664eb35 (Saving my local changes before pulling)
         &copy; {new Date().getFullYear()} Local Search Simulator. All rights reserved.
       </p>
     </div>
@@ -304,6 +611,10 @@ useEffect(() => {
         <a href="/privacy" className="text-decoration-none opacity-75 hover-opacity-100">Privacy Policy</a>
         <a href="/terms" className="text-decoration-none opacity-75 hover-opacity-100">Terms & Conditions</a>
         <a href="/about" className="text-decoration-none opacity-75 hover-opacity-100">About</a>
+<<<<<<< HEAD
+=======
+        
+>>>>>>> 664eb35 (Saving my local changes before pulling)
       </nav>
     </div>
   </div>
@@ -312,8 +623,13 @@ useEffect(() => {
     <div className="col-12 text-center small opacity-50">
       <p style={{ fontSize: '0.75rem' }}>
         <strong>SEO Note:</strong> This tool is 
+<<<<<<< HEAD
       designed for research purposes. It simulates localized search environments to help 
       professionals analyze regional intent accurately.
+=======
+    designed for research purposes. It simulates localized search environments to help 
+    professionals analyze international and regional search intent accurately.
+>>>>>>> 664eb35 (Saving my local changes before pulling)
       </p>
     </div>
   </div>
@@ -322,4 +638,8 @@ useEffect(() => {
     </main>
     </>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> 664eb35 (Saving my local changes before pulling)
