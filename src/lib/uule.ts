@@ -1,4 +1,4 @@
-import uuleArrayRaw from "../../src/data/uule_updated.json";
+import uuleArrayRaw from "@/src/data/uule_updated.json";
 
 
 
