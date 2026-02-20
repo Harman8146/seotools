@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getUULE, uuleArray, getGL } from "../src/lib/uule";
+// import { getUULE, uuleArray, getGL } from "../src/lib/uule";
 
 export default function Home() {
   const [dark, setDark] = useState(false);
