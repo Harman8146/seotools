@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-<<<<<<< HEAD
+
 // import { getUULE, uuleArray, getGL } from "../src/lib/uule";
 // import { getUULE, uuleArray, getGL } from "@/src/lib/uule";
 
@@ -101,7 +101,7 @@ useEffect(() => {
 
 
   
-=======
+
 import { getUULE, uuleArray, getGL } from "../src/lib/uule";
 
 export default function Home() {
@@ -117,7 +117,7 @@ export default function Home() {
     countryCode: string;
     state: string;
   } | null>(null);
->>>>>>> 664eb35 (Saving my local changes before pulling)
+
 
   useEffect(() => {
     document.body.style.background = dark
@@ -125,10 +125,9 @@ export default function Home() {
       : "#f8fafc";
   }, [dark]);
 
-/* =======================
-<<<<<<< HEAD
-    LOCAL SUGGESTIONS (FIXED)
-======================= */
+
+  //  LOCAL SUGGESTIONS (FIXED)
+
 useEffect(() => {
     if (locationSelected || query.length < 2 || !isDataLoaded) {
       setSuggestions([]);
@@ -324,9 +323,8 @@ searchCache.set(cacheKey, now);
 
   await res.json();
 };
-=======
-    LOCAL SUGGESTIONS
-======================= */
+
+//  LOCAL SUGGESTIONS 
 useEffect(() => {
   // If the user hasn't typed enough or already selected a city, clear suggestions
   if (locationSelected || query.length < 2) {
@@ -410,10 +408,10 @@ useEffect(() => {
 
       <div className="container" style={{ maxWidth: "800px" }}>
 
-=======
+
       <div className="container" style={{ maxWidth: "800px" }}>
 
->>>>>>> 664eb35 (Saving my local changes before pulling)
+
         
         
         {/* HEADER SECTION (SEO H1) */}
@@ -467,7 +465,7 @@ useEffect(() => {
 
             </div>
 
-<<<<<<< HEAD
+
              <button onClick={search} disabled={loading}>
         {loading ? "Searching..." : "Search"}
       </button>
@@ -478,8 +476,7 @@ useEffect(() => {
         ))}
       </ul>
 
-=======
->>>>>>> 664eb35 (Saving my local changes before pulling)
+
             <div className="row g-3 mb-4">
               <div className="col-md-6">
                 <label className="form-label fw-bold small">GOOGLE DOMAIN</label>
@@ -532,12 +529,12 @@ useEffect(() => {
           </div>
         </section>
 
-<<<<<<< HEAD
+
 
  <section className="mb-10">
-=======
+
         <section className="mb-10">
->>>>>>> 664eb35 (Saving my local changes before pulling)
+
         <p className="mb-6 text-lg">
           If you need to check Google search results from a different city or country, you’re in the right place. 
           We built this <strong>Google Search Simulator</strong> to provide SEO professionals and business owners 
@@ -598,11 +595,11 @@ useEffect(() => {
       <footer className="mt-5 pt-5 border-top">
   <div className="row g-4 align-items-center">
     <div className="col-md-6 text-center text-md-start">
-<<<<<<< HEAD
+
       <p className="small mb-0">
-=======
+
       <p className="small opacity-75 mb-0">
->>>>>>> 664eb35 (Saving my local changes before pulling)
+
         &copy; {new Date().getFullYear()} Local Search Simulator. All rights reserved.
       </p>
     </div>
@@ -611,10 +608,9 @@ useEffect(() => {
         <a href="/privacy" className="text-decoration-none opacity-75 hover-opacity-100">Privacy Policy</a>
         <a href="/terms" className="text-decoration-none opacity-75 hover-opacity-100">Terms & Conditions</a>
         <a href="/about" className="text-decoration-none opacity-75 hover-opacity-100">About</a>
-<<<<<<< HEAD
-=======
+
         
->>>>>>> 664eb35 (Saving my local changes before pulling)
+
       </nav>
     </div>
   </div>
@@ -623,13 +619,13 @@ useEffect(() => {
     <div className="col-12 text-center small opacity-50">
       <p style={{ fontSize: '0.75rem' }}>
         <strong>SEO Note:</strong> This tool is 
-<<<<<<< HEAD
+
       designed for research purposes. It simulates localized search environments to help 
       professionals analyze regional intent accurately.
-=======
+
     designed for research purposes. It simulates localized search environments to help 
     professionals analyze international and regional search intent accurately.
->>>>>>> 664eb35 (Saving my local changes before pulling)
+
       </p>
     </div>
   </div>
@@ -638,8 +634,8 @@ useEffect(() => {
     </main>
     </>
   );
-<<<<<<< HEAD
+
 }
-=======
+
 }
->>>>>>> 664eb35 (Saving my local changes before pulling)
+
