@@ -1,0 +1,170 @@
+// ============================================
+// UPDATED FRONTEND: Shows Remaining Searches
+// File: /app/page.tsx (UPDATE THIS PART)
+// ============================================
+"use client";
+
+import { useState, useEffect } from "react";
+
+// Add this to your existing states:
+const [remainingSearches, setRemainingSearches] = useState<number>(100);
+
+// Update your searchWithBrowserless function:
+const searchWithBrowserless = async (pageNumber: number = 1, maxRetries = 3) => {
+  if (!keyword || !pickedLocation) {
+    setStatus("⚠️ Please enter keyword and select location");
+    return;
+  }
+
+  setLoading(true);
+  setStatus("🔄 Starting search...");
+
+  // Add delay
+  const delay = 5000 + Math.random() * 5000;  // 5-10 seconds
+  setStatus(`⏳ Waiting ${Math.round(delay/1000)}s...`);
+  await sleep(delay);
+
+  // Retry logic
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      setStatus(`🔄 Attempt ${attempt}/${maxRetries}...`);
+      
+      const params = new URLSearchParams({
+        q: keyword,
+        city: pickedLocation.city,
+        state: pickedLocation.state || "",
+        country: pickedLocation.countryCode,
+        page: pageNumber.toString(),
+        hl: language,
+        domain,
+        adtest: "on",
+      });
+
+      const response = await fetch(`/api/search-browserless?${params.toString()}`);
+      const data = await response.json();
+
+      // ✅ UPDATE REMAINING SEARCHES
+      if (data.remaining !== undefined) {
+        setRemainingSearches(data.remaining);
+      }
+
+      if (data.success) {
+        searchCount++;
+        setStatus(
+          `✅ Success via ${data.proxyUsed}! ` +
+          `(${data.remaining} searches left this hour)`
+        );
+        
+        window.open(data.googleUrl, "_blank", "noopener,noreferrer");
+        
+        setTimeout(() => setStatus(""), 5000);
+        setLoading(false);
+        return;
+      }
+
+      if (data.blocked || data.rateLimited) {
+        const waitSec = data.retryAfterSec || 30;
+        
+        if (data.remaining === 0) {
+          // Hourly limit reached
+          setStatus(
+            `⚠️ Hourly limit reached (100 searches). ` +
+            `Resets in ${Math.ceil(waitSec/60)} minutes. ` +
+            `Opening in browser...`
+          );
+          window.open(data.googleUrl, "_blank", "noopener,noreferrer");
+          setLoading(false);
+          return;
+        }
+        
+        if (attempt < maxRetries) {
+          setStatus(`⚠️ ${data.error} - Retrying in ${waitSec}s...`);
+          await sleep(waitSec * 1000);
+          continue;
+        } else {
+          setStatus(`⚠️ ${data.error} - Opening in browser`);
+          window.open(data.googleUrl, "_blank", "noopener,noreferrer");
+        }
+      }
+
+    } catch (error: any) {
+      console.error(`❌ Attempt ${attempt} failed:`, error);
+      
+      if (attempt === maxRetries) {
+        setStatus("❌ API unavailable - Opening in browser");
+        openGoogle(pageNumber);
+      } else {
+        setStatus(`⚠️ Error - Retrying...`);
+        await sleep(5000);
+      }
+    }
+  }
+
+  setLoading(false);
+  setTimeout(() => setStatus(""), 5000);
+};
+
+// ============================================
+// ADD THIS TO YOUR JSX (after the buttons)
+// ============================================
+
+{/* USAGE STATS */}
+<div className="mt-4 p-3 rounded" style={{ 
+  background: dark ? "#1e293b" : "#f1f5f9" 
+}}>
+  <div className="row">
+    <div className="col-md-6">
+      <div className="text-center">
+        <h6 className="mb-2 opacity-75 small">SEARCHES THIS HOUR</h6>
+        <div className="display-6 fw-bold">
+          {100 - remainingSearches}
+          <span className="h5 opacity-50"> / 100</span>
+        </div>
+        <div className="progress mt-2" style={{ height: "8px" }}>
+          <div 
+            className="progress-bar bg-primary"
+            style={{ 
+              width: `${((100 - remainingSearches) / 100) * 100}%` 
+            }}
+          />
+        </div>
+      </div>
+    </div>
+    <div className="col-md-6">
+      <div className="text-center">
+        <h6 className="mb-2 opacity-75 small">REMAINING</h6>
+        <div className={`display-6 fw-bold ${
+          remainingSearches < 20 ? 'text-danger' :
+          remainingSearches < 50 ? 'text-warning' :
+          'text-success'
+        }`}>
+          {remainingSearches}
+        </div>
+        <p className="small opacity-75 mb-0 mt-2">
+          {remainingSearches === 0 
+            ? "Limit reached - resets in 1 hour"
+            : "Resets every hour"
+          }
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* WARNING IF RUNNING LOW */}
+{remainingSearches < 20 && remainingSearches > 0 && (
+  <div className="alert alert-warning mt-3">
+    <strong>⚠️ Running low!</strong> Only {remainingSearches} searches left this hour.
+  </div>
+)}
+
+{/* LIMIT REACHED */}
+{remainingSearches === 0 && (
+  <div className="alert alert-info mt-3">
+    <strong>ℹ️ Hourly limit reached</strong>
+    <p className="mb-0">
+      You've used all 100 searches this hour. Counter will reset in 60 minutes.
+      You can still search using the "Copy URL" button and opening in your browser.
+    </p>
+  </div>
+)}
