@@ -74,20 +74,22 @@ useEffect(() => {
 
   return (
     <>
-    {/* TOP HEADER DISCLAIMER - FULL WIDTH
-<div className="w-100 py-2 px-3 text-center mb-4 " 
+   {/* TOP HEADER DISCLAIMER - FULL WIDTH */}
+<div
+  className="w-100 py-2 px-3 text-center mb-4"
+  style={{
+    background: dark ? "#450a0a" : "#fff7ed",
+    borderBottom: `1px solid ${dark ? "#991b1b" : "#fed7aa"}`,
+    fontSize: "0.85rem",
+  }}
+>
+  <span className="fw-bold text-warning">⚠️ Pro-Tip:</span>
 
-     style={{ 
-       background: dark ? "#450a0a" : "#fffcfc", 
-       borderBottom: `1px solid ${dark ? "#991b1b" : "#ffffff"}`,
-       
-       fontSize: "0.85rem", 
-       
-     }}>
-  <span className="fw-bold text-danger ">⚠️ Pro-Tip:</span> 
-  {" "}If you see a <strong>403 Error</strong>, please close the tab and reopen it. 
-  For best results, use a <strong>Private or Incognito tab</strong> to ensure non-personalized results.
-</div> */}
+  {" "}For best results, use a{" "}
+  <strong>Private or Incognito Window</strong> and avoid rapid repeated
+  searches. If Google shows a <strong>403 Error</strong>, simply close the
+  tab and reopen the search.
+</div>
 
     <main className={`container-fluid py-5 ${dark ? "text-light" : "text-dark"}`}>
 
