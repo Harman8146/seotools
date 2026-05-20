@@ -16,6 +16,7 @@
     "csv-parser": "^3.2.0",
     "csv-stringify": "^6.6.0",
     "framer-motion": "^12.39.0",
+    "linkedom": "^0.18.12",
     "lucide-react": "^0.563.0",
     "meta": "^2.2.25",
     "metadata": "^0.1.0",

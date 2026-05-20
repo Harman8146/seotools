@@ -1,3 +1,5 @@
+import * as cheerio from "cheerio";
+
 export type Heading = {
   level: 1 | 2 | 3 | 4 | 5 | 6;
   text: string;
@@ -74,10 +76,6 @@ type CheerioRoot = {
   (selector: string | CheerioElement): CheerioSelection;
 };
 
-type CheerioModule = {
-  load(html: string): CheerioRoot;
-};
-
 const MAX_INTERNAL_PAGES = 10;
 const REQUEST_TIMEOUT_MS = 9000;
 const DEFAULT_DELAY_MS = 900;
@@ -90,7 +88,6 @@ const USER_AGENT =
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
 
 export async function crawlGeoSite(inputUrl: string): Promise<GeoCrawlResult> {
-  const cheerio = await loadCheerio();
   const startUrl = normalizeInputUrl(inputUrl);
   assertPublicHttpUrl(startUrl);
 
@@ -141,7 +138,7 @@ export async function crawlGeoSite(inputUrl: string): Promise<GeoCrawlResult> {
       }
 
       const html = await readLimitedText(response);
-      const extracted = extractPageData(cheerio, current, html, origin);
+      const extracted = extractPageData(current, html, origin);
       extracted.status = response.status;
       pages.push(extracted);
 
@@ -180,8 +177,8 @@ export async function crawlGeoSite(inputUrl: string): Promise<GeoCrawlResult> {
   };
 }
 
-function extractPageData(cheerio: CheerioModule, url: string, html: string, origin: string): ExtractedPage {
-  const $ = cheerio.load(html);
+function extractPageData(url: string, html: string, origin: string): ExtractedPage {
+  const $ = cheerio.load(html) as unknown as CheerioRoot;
 
   $("script, style, noscript, svg, canvas, iframe").remove();
 
@@ -489,19 +486,4 @@ function cleanText(value: string): string {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function loadCheerio(): Promise<CheerioModule> {
-  const importer = new Function("name", "return import(name)") as (name: string) => Promise<unknown>;
-  const imported = await importer("cheerio").catch(() => null);
-
-  if (!isRecord(imported) || typeof imported.load !== "function") {
-    throw new Error("Cheerio is required for GEO analysis. Install it with `npm install cheerio`.");
-  }
-
-  return imported as CheerioModule;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
