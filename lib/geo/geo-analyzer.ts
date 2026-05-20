@@ -1,6 +1,8 @@
 import type { GeoCrawlResult } from "./crawler";
 import { calculateGeoScore, type GeoScoreBreakdown } from "./score-engine";
 import { generateRuleBasedSuggestions, type Suggestion } from "./suggestions";
+//  DO THIS:
+import * as cheerio from 'cheerio';
 
 export type GeoAnalysisResult = {
   geoScore: number;
