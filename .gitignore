@@ -10,6 +10,9 @@
 !.yarn/releases
 !.yarn/versions
 
+# FORCE GIT TO TRACK UNDICI FOR CHEERIO
+!node_modules/undici/
+
 # testing
 /coverage
 
