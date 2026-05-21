@@ -17,11 +17,23 @@ export type ExtractedPage = {
   canonicalUrl: string;
   robotsMeta: string;
   jsonLd: unknown[];
+  schemaTypes: string[];
   tables: string[];
   lists: string[];
+  paragraphs: string[];
+  images: {
+    total: number;
+    missingAlt: number;
+  };
+  openGraph: Record<string, string>;
+  twitterCard: Record<string, string>;
   authorSignals: string[];
   contactSignals: string[];
   aboutSignals: string[];
+  trustSignals: string[];
+  socialProofSignals: string[];
+  freshnessSignals: string[];
+  externalLinks: string[];
   textContent: string;
   wordCount: number;
 };
@@ -34,6 +46,7 @@ export type CrawlTechnicalFindings = {
     found: boolean;
     url: string;
     crawlDelayMs: number;
+    aiCrawlerAccess: AiCrawlerAccess[];
   };
   llmsTxt: {
     found: boolean;
@@ -53,6 +66,17 @@ type RobotsRules = {
   allow: string[];
   disallow: string[];
   crawlDelayMs?: number;
+};
+
+export type AiCrawlerAccess = {
+  crawler: "GPTBot" | "ClaudeBot" | "PerplexityBot" | "Google-Extended" | "CCBot" | "Bytespider";
+  status: "allowed" | "blocked" | "partially restricted";
+  matchedRules: string[];
+};
+
+type ParsedRobots = RobotsRules & {
+  found: boolean;
+  groups: Array<{ agents: string[]; allow: string[]; disallow: string[] }>;
 };
 
 type CheerioElement = {
@@ -78,7 +102,7 @@ type CheerioRoot = {
 
 const MAX_INTERNAL_PAGES = 10;
 const REQUEST_TIMEOUT_MS = 9000;
-const DEFAULT_DELAY_MS = 900;
+const DEFAULT_DELAY_MS = 250;
 const MAX_RETRIES = 2;
 const MAX_HTML_BYTES = 1_500_000;
 const USER_AGENT =
@@ -94,8 +118,7 @@ export async function crawlGeoSite(inputUrl: string): Promise<GeoCrawlResult> {
   const origin = startUrl.origin;
   const robotsUrl = new URL("/robots.txt", origin).toString();
   const llmsUrl = new URL("/llms.txt", origin).toString();
-  const robots = await fetchRobots(robotsUrl);
-  const llms = await checkLlmsTxt(llmsUrl);
+  const [robots, llms] = await Promise.all([fetchRobots(robotsUrl), checkLlmsTxt(llmsUrl)]);
   const delayMs = Math.max(robots.crawlDelayMs ?? DEFAULT_DELAY_MS, DEFAULT_DELAY_MS);
 
   const queue = [canonicalizeUrl(startUrl)];
@@ -171,6 +194,7 @@ export async function crawlGeoSite(inputUrl: string): Promise<GeoCrawlResult> {
         found: robots.found,
         url: robotsUrl,
         crawlDelayMs: delayMs,
+        aiCrawlerAccess: analyzeAiCrawlerAccess(startUrl, robots),
       },
       llmsTxt: llms,
     },
@@ -186,6 +210,8 @@ function extractPageData(url: string, html: string, origin: string): ExtractedPa
   const metaDescription = cleanText($('meta[name="description"]').attr("content") ?? "");
   const canonicalUrl = absolutizeUrl($('link[rel="canonical"]').attr("href") ?? "", url);
   const robotsMeta = cleanText($('meta[name="robots"]').attr("content") ?? "");
+  const openGraph = extractMetaMap($, 'meta[property^="og:"]', "property");
+  const twitterCard = extractMetaMap($, 'meta[name^="twitter:"]', "name");
   const headings = $("h1,h2,h3,h4,h5,h6")
     .toArray()
     .map((element) => ({
@@ -204,9 +230,12 @@ function extractPageData(url: string, html: string, origin: string): ExtractedPa
     .toArray()
     .map((element) => parseJsonLd($(element).html() ?? ""))
     .filter((value): value is unknown => value !== null);
+  const schemaTypes = extractSchemaTypes(jsonLd, schemaMarkup);
 
   const faqContent = extractFaqContent($);
   const internalLinks = extractInternalLinks($, url, origin);
+  const externalLinks = extractExternalLinks($, url, origin);
+  const images = extractImageSignals($);
   const tables = $("table")
     .toArray()
     .map((element) => cleanText($(element).text()))
@@ -217,6 +246,11 @@ function extractPageData(url: string, html: string, origin: string): ExtractedPa
     .map((element) => cleanText($(element).text()))
     .filter((text) => text.split(" ").length >= 4)
     .slice(0, 40);
+  const paragraphs = $("p")
+    .toArray()
+    .map((element) => cleanText($(element).text()))
+    .filter((text) => text.split(" ").length >= 8)
+    .slice(0, 80);
   const bodyText = cleanText($("body").text());
   const signalText = [bodyText, title, metaDescription, headings.map((heading) => heading.text).join(" ")].join(" ");
 
@@ -232,27 +266,36 @@ function extractPageData(url: string, html: string, origin: string): ExtractedPa
     canonicalUrl,
     robotsMeta,
     jsonLd,
+    schemaTypes,
     tables,
     lists,
+    paragraphs,
+    images,
+    openGraph,
+    twitterCard,
     authorSignals: collectSignals(signalText, /\b(author|written by|reviewed by|editor|expert|byline|profile)\b/gi),
     contactSignals: collectSignals(signalText, /\b(contact|email|phone|support|address|customer service)\b/gi),
     aboutSignals: collectSignals(signalText, /\b(about us|about|mission|team|company|organization|who we are)\b/gi),
+    trustSignals: collectSignals(signalText, /\b(review|testimonial|guarantee|secure|certified|licensed|award|privacy policy|terms|refund|shipping|verified)\b/gi),
+    socialProofSignals: collectSignals(signalText, /\b(testimonial|reviews?|rated|stars?|clients?|customers?|case study|portfolio)\b/gi),
+    freshnessSignals: collectSignals(signalText, /\b(20\d{2}|updated|last updated|published|reviewed|new|latest|current)\b/gi),
+    externalLinks,
     textContent: bodyText,
     wordCount: countWords(bodyText),
   };
 }
 
-async function fetchRobots(url: string): Promise<RobotsRules & { found: boolean }> {
+async function fetchRobots(url: string): Promise<ParsedRobots> {
   try {
     const response = await fetchWithTimeout(url, { timeoutMs: REQUEST_TIMEOUT_MS });
     if (!response.ok) {
-      return { found: false, allow: [], disallow: [] };
+      return { found: false, allow: [], disallow: [], groups: [] };
     }
 
     const text = await response.text();
     return { found: true, ...parseRobotsTxt(text) };
   } catch {
-    return { found: false, allow: [], disallow: [] };
+    return { found: false, allow: [], disallow: [], groups: [] };
   }
 }
 
@@ -265,8 +308,10 @@ async function checkLlmsTxt(url: string): Promise<CrawlTechnicalFindings["llmsTx
   }
 }
 
-function parseRobotsTxt(text: string): RobotsRules {
+function parseRobotsTxt(text: string): RobotsRules & { groups: ParsedRobots["groups"] } {
   const rules: RobotsRules = { allow: [], disallow: [] };
+  const groups: ParsedRobots["groups"] = [];
+  let currentGroup: ParsedRobots["groups"][number] | null = null;
   let applies = false;
 
   for (const rawLine of text.split(/\r?\n/)) {
@@ -282,7 +327,19 @@ function parseRobotsTxt(text: string): RobotsRules {
     if (key === "user-agent") {
       const agent = value.toLowerCase();
       applies = agent === "*" || agent.includes("geoauditbot");
+      if (!currentGroup || currentGroup.allow.length > 0 || currentGroup.disallow.length > 0) {
+        currentGroup = { agents: [], allow: [], disallow: [] };
+        groups.push(currentGroup);
+      }
+      currentGroup.agents.push(agent);
       continue;
+    }
+
+    if (currentGroup && key === "allow" && value) {
+      currentGroup.allow.push(value);
+    }
+    if (currentGroup && key === "disallow" && value) {
+      currentGroup.disallow.push(value);
     }
 
     if (!applies) {
@@ -303,7 +360,7 @@ function parseRobotsTxt(text: string): RobotsRules {
     }
   }
 
-  return rules;
+  return { ...rules, groups };
 }
 
 function isAllowedByRobots(url: URL, rules: RobotsRules): boolean {
@@ -384,6 +441,112 @@ function extractInternalLinks($: CheerioRoot, pageUrl: string, origin: string): 
   });
 
   return Array.from(links).slice(0, 80);
+}
+
+function extractExternalLinks($: CheerioRoot, pageUrl: string, origin: string): string[] {
+  const links = new Set<string>();
+
+  $("a[href]").each((_, element) => {
+    const href = $(element).attr("href") ?? "";
+    try {
+      const url = new URL(href, pageUrl);
+      if (url.origin !== origin && ["http:", "https:"].includes(url.protocol)) {
+        url.hash = "";
+        links.add(url.toString());
+      }
+    } catch {
+      // Ignore malformed links.
+    }
+  });
+
+  return Array.from(links).slice(0, 40);
+}
+
+function extractImageSignals($: CheerioRoot): ExtractedPage["images"] {
+  let total = 0;
+  let missingAlt = 0;
+
+  $("img").each((_, element) => {
+    total += 1;
+    if (!cleanText($(element).attr("alt") ?? "")) {
+      missingAlt += 1;
+    }
+  });
+
+  return { total, missingAlt };
+}
+
+function extractMetaMap($: CheerioRoot, selector: string, keyAttribute: "name" | "property"): Record<string, string> {
+  const values: Record<string, string> = {};
+
+  $(selector).each((_, element) => {
+    const key = cleanText($(element).attr(keyAttribute) ?? "");
+    const content = cleanText($(element).attr("content") ?? "");
+    if (key && content) {
+      values[key] = content;
+    }
+  });
+
+  return values;
+}
+
+function extractSchemaTypes(jsonLd: unknown[], microdata: string[]): string[] {
+  const found = new Set<string>();
+
+  for (const item of jsonLd) {
+    collectJsonLdTypes(item, found);
+  }
+
+  for (const value of microdata) {
+    const match = value.match(/schema\.org\/([A-Za-z]+)/i);
+    if (match?.[1]) {
+      found.add(match[1]);
+    }
+  }
+
+  return Array.from(found).slice(0, 30);
+}
+
+function collectJsonLdTypes(value: unknown, found: Set<string>): void {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectJsonLdTypes(item, found));
+    return;
+  }
+
+  if (!isRecord(value)) {
+    return;
+  }
+
+  const type = value["@type"];
+  if (typeof type === "string") {
+    found.add(type);
+  }
+  if (Array.isArray(type)) {
+    type.filter((item): item is string => typeof item === "string").forEach((item) => found.add(item));
+  }
+
+  Object.values(value).forEach((item) => collectJsonLdTypes(item, found));
+}
+
+function analyzeAiCrawlerAccess(startUrl: URL, robots: ParsedRobots): AiCrawlerAccess[] {
+  const crawlers: AiCrawlerAccess["crawler"][] = ["GPTBot", "ClaudeBot", "PerplexityBot", "Google-Extended", "CCBot", "Bytespider"];
+
+  return crawlers.map((crawler) => {
+    const agent = crawler.toLowerCase();
+    const groups = robots.groups.filter((group) => group.agents.includes(agent) || group.agents.includes("*"));
+    const matchedRules = groups.flatMap((group) => group.disallow.map((rule) => `Disallow: ${rule}`).concat(group.allow.map((rule) => `Allow: ${rule}`)));
+    const disallow = groups.flatMap((group) => group.disallow);
+    const allow = groups.flatMap((group) => group.allow);
+    const homeAllowed = isAllowedByRobots(startUrl, { allow, disallow });
+    const hasBroadBlock = disallow.some((rule) => rule === "/");
+    const hasPartialRules = disallow.some((rule) => rule && rule !== "/");
+
+    return {
+      crawler,
+      status: hasBroadBlock && !homeAllowed ? "blocked" : hasPartialRules ? "partially restricted" : "allowed",
+      matchedRules: matchedRules.slice(0, 8),
+    };
+  });
 }
 
 function extractFaqContent($: CheerioRoot): string[] {
@@ -486,4 +649,8 @@ function cleanText(value: string): string {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

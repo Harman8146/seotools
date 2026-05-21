@@ -1,5 +1,8 @@
+import { SiteFooter } from "@/components/site-footer";
+
 export default function Terms() {
   return (
+    <>
     <main className="container py-5" style={{ maxWidth: "800px" }}>
       <h1 className="fw-bold mb-4">Terms and Conditions</h1>
       
@@ -15,7 +18,7 @@ export default function Terms() {
       <section className="mt-4">
         <h2 className="h4 fw-bold">2. Service Limitations</h2>
         <p>
-          We provide this tool "as is." Search results are subject to real-time algorithmic 
+          We provide this tool &quot;as is.&quot; Search results are subject to real-time algorithmic 
           changes, personalized browser history, and IP-based security measures implemented 
           by search engines.
         </p>
@@ -29,5 +32,7 @@ export default function Terms() {
         </p>
       </section>
     </main>
+    <SiteFooter />
+    </>
   );
 }

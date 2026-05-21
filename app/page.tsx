@@ -5,17 +5,22 @@ import {
   Activity,
   ArrowRight,
   Bot,
+  CalendarDays,
   CheckCircle2,
-  FileSearch,
   Gauge,
+  Newspaper,
   Network,
+  Radio,
+  RefreshCw,
   Search,
   ShieldCheck,
   Sparkles,
   Workflow,
 } from "lucide-react";
 import Link from "next/link"; 
+import { SiteFooter } from "@/components/site-footer";
 import { SiteNavbar } from "@/components/site-navbar";
+import { useEffect, useMemo, useState } from "react";
 
 const features = [
   {
@@ -56,13 +61,126 @@ const steps = [
   "Get SEO + GEO Recommendations",
 ];
 
+type UpdateCategory = "All" | "SEO" | "GEO" | "AI Search" | "Google Update" | "ChatGPT" | "Gemini" | "Technical SEO";
+
+type IndustryUpdate = {
+  title: string;
+  summary: string;
+  category: Exclude<UpdateCategory, "All">;
+  publishedAt: string;
+  source: string;
+  url: string;
+};
+
+const updateFeeds = [
+  { source: "Google Search Central", category: "Google Update" as const, feed: "https://feeds.feedburner.com/blogspot/amDG" },
+  { source: "Search Engine Journal", category: "SEO" as const, feed: "https://www.searchenginejournal.com/feed/" },
+  { source: "Search Engine Land", category: "SEO" as const, feed: "https://searchengineland.com/feed" },
+  { source: "OpenAI News", category: "ChatGPT" as const, feed: "https://openai.com/news/rss.xml" },
+];
+
+const fallbackUpdates: IndustryUpdate[] = [
+  {
+    title: "Google Search Central publishes official search and structured data updates",
+    summary: "Track crawling, indexing, ranking systems, Search Console, structured data, and AI-era search guidance from Google's official SEO channel.",
+    category: "Google Update",
+    publishedAt: "Cached source",
+    source: "Google Search Central",
+    url: "https://developers.google.com/search/blog",
+  },
+  {
+    title: "AI search visibility is becoming a measurable SEO workflow",
+    summary: "Teams are auditing answer extraction, entities, citations, crawler access, and page-level content gaps as part of modern GEO programs.",
+    category: "GEO",
+    publishedAt: "Cached source",
+    source: "GEO Trends",
+    url: "/ai-visibility-checker",
+  },
+  {
+    title: "OpenAI product updates continue to shape ChatGPT search behavior",
+    summary: "Monitor model, product, and search-related announcements to understand how conversational discovery may affect brand visibility.",
+    category: "ChatGPT",
+    publishedAt: "Cached source",
+    source: "OpenAI",
+    url: "https://openai.com/news/",
+  },
+  {
+    title: "Technical SEO remains foundational for AI crawler access",
+    summary: "Robots directives, canonical URLs, internal links, schema, and page readability continue to influence how machines retrieve content.",
+    category: "Technical SEO",
+    publishedAt: "Cached source",
+    source: "SEO GEO Platform",
+    url: "/ai-visibility-checker",
+  },
+];
+
+const updateCategories: UpdateCategory[] = ["All", "SEO", "GEO", "AI Search", "Google Update", "ChatGPT", "Gemini", "Technical SEO"];
+
 export default function Home() {
+  const [updates, setUpdates] = useState<IndustryUpdate[]>(fallbackUpdates);
+  const [updatesLoading, setUpdatesLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<UpdateCategory>("All");
+
+  useEffect(() => {
+    let cancelled = false;
+    const cacheKey = "seo-ai-industry-updates-v1";
+    const cached = readUpdatesCache(cacheKey);
+
+    if (cached.length > 0) {
+      setUpdates(cached);
+      setUpdatesLoading(false);
+      return;
+    }
+
+    async function loadUpdates() {
+      try {
+        const loaded = await Promise.all(updateFeeds.map(fetchFeedUpdates));
+        const merged = loaded.flat().sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()).slice(0, 12);
+        if (!cancelled && merged.length > 0) {
+          setUpdates(merged);
+          localStorage.setItem(cacheKey, JSON.stringify({ savedAt: Date.now(), updates: merged }));
+        }
+      } catch {
+        if (!cancelled) {
+          setUpdates(fallbackUpdates);
+        }
+      } finally {
+        if (!cancelled) {
+          setUpdatesLoading(false);
+        }
+      }
+    }
+
+    const runWhenIdle = () => {
+      if ("requestIdleCallback" in window) {
+        const idleId = window.requestIdleCallback(loadUpdates, { timeout: 2200 });
+        return () => window.cancelIdleCallback(idleId);
+      }
+
+      const timer = setTimeout(loadUpdates, 900);
+      return () => clearTimeout(timer);
+    };
+
+    const cancelIdle = runWhenIdle();
+
+    return () => {
+      cancelled = true;
+      cancelIdle();
+    };
+  }, []);
+
+  const filteredUpdates = useMemo(() => {
+    if (activeCategory === "All") return updates;
+    return updates.filter((item) => item.category === activeCategory);
+  }, [activeCategory, updates]);
+
   return (
     <main className="min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,#e0e7ff_0%,#f8fafc_38%,#ffffff_100%)] text-slate-950 dark:bg-[radial-gradient(circle_at_top,#0f172a_0%,#020617_58%,#000000_100%)] dark:text-white">
       <SiteNavbar />
 
       <section className="relative px-4 pb-20 pt-16 md:pb-28 md:pt-24">
         <div className="absolute inset-x-0 top-0 -z-0 h-[520px] bg-[linear-gradient(135deg,rgba(37,99,235,0.14),rgba(14,165,233,0.08),transparent_70%)]" />
+        <div className="premium-aurora" aria-hidden="true" />
         <motion.div
           className="absolute left-0 top-28 h-44 w-full -skew-y-6 bg-gradient-to-r from-blue-500/10 via-sky-400/10 to-indigo-500/10 blur-2xl"
           animate={{ x: [0, 18, 0], opacity: [0.55, 0.85, 0.55] }}
@@ -76,23 +194,40 @@ export default function Home() {
               <Sparkles size={16} aria-hidden="true" />
               AI search visibility meets technical SEO
             </div>
-            <h1 className="max-w-4xl text-5xl font-black leading-[1.02] tracking-tight md:text-7xl">
-              AI-Powered SEO & GEO Optimization Platform
-            </h1>
+              <h1 className="max-w-4xl text-5xl font-black leading-[1.02] tracking-tight md:text-7xl">
+                AI-Powered SEO & GEO Optimization Platform
+              </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 md:text-xl dark:text-slate-300">
               Analyze technical SEO, AI visibility, GEO optimization, semantic structure, and search performance with
               modern AI-focused auditing tools.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <CtaButton href="/seo" label="Ranking Checker" icon={<Search size={19} />} secondary/>
-              <CtaButton href="/geo" label="Analyze GEO" icon={<Bot size={19} />} secondary />
+              <CtaButton href="/ai-visibility-checker" label="Analyze GEO" icon={<Bot size={19} />} secondary />
+            </div>
+            <div className="mt-8 grid max-w-2xl gap-3 sm:grid-cols-3">
+              {["100k+ locations", "Rule-based AI audit", "No login required"].map((item, index) => (
+                <motion.div
+                  key={item}
+                  className="rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm font-black text-slate-700 shadow-lg backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200"
+                  animate={{ y: [0, -4, 0] }}
+                  transition={{ duration: 4 + index, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  {item}
+                </motion.div>
+              ))}
             </div>
           </motion.div>
 
           <DashboardPreview />
         </div>
       </section>
-
+<IndustryUpdatesSection
+        updates={filteredUpdates}
+        loading={updatesLoading}
+        activeCategory={activeCategory}
+        onCategoryChange={setActiveCategory}
+      />
       <SectionShell eyebrow="Platform Features" title="Everything you need to improve search and AI visibility">
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, index) => {
@@ -154,7 +289,7 @@ export default function Home() {
           />
           <ToolCard
             title="GEO Analyzer"
-            href="/geo"
+            href="/ai-visibility-checker"
             button="Open GEO Analyzer"
             icon={<Bot size={24} />}
             bullets={["AI visibility scoring", "GPTBot checks", "Semantic SEO", "Entity optimization", "llms.txt analysis"]}
@@ -162,6 +297,8 @@ export default function Home() {
           />
         </div>
       </SectionShell>
+
+      
 
       <section className="px-4 py-16 md:py-24">
         <motion.div
@@ -185,12 +322,13 @@ export default function Home() {
               </div>
               <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
                 {/* <CtaButton href="/seo" label="Start SEO Audit" icon={<FileSearch size={18} />} light /> */}
-                <CtaButton href="/geo" label="Run GEO Analysis" icon={<Sparkles size={18} />} secondary light />
+                <CtaButton href="/ai-visibility-checker" label="Run GEO Analysis" icon={<Sparkles size={18} />} secondary light />
               </div>
             </div>
           </div>
         </motion.div>
       </section>
+      <SiteFooter />
     </main>
   );
 }
@@ -347,4 +485,172 @@ function ToolCard({
       </Link>
     </motion.article>
   );
+}
+
+function IndustryUpdatesSection({
+  updates,
+  loading,
+  activeCategory,
+  onCategoryChange,
+}: {
+  updates: IndustryUpdate[];
+  loading: boolean;
+  activeCategory: UpdateCategory;
+  onCategoryChange: (category: UpdateCategory) => void;
+}) {
+  return (
+    <section className="relative px-4 py-14 md:py-20">
+      <div className="premium-aurora opacity-70" aria-hidden="true" />
+      <div className="relative mx-auto max-w-6xl">
+        <motion.div
+          className="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-end"
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.35 }}
+        >
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/75 px-4 py-2 text-sm font-black text-blue-700 shadow-sm backdrop-blur dark:border-sky-400/20 dark:bg-slate-900/70 dark:text-sky-300">
+              <Radio size={16} aria-hidden="true" />
+              Live industry radar
+            </div>
+            <h2 className="text-3xl font-black tracking-tight md:text-5xl">Latest SEO & AI Search Updates</h2>
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-600 md:text-base dark:text-slate-300">
+              A lightweight RSS-powered briefing for SEO news, Google updates, AI search trends, GEO, ChatGPT, Gemini,
+              and crawler changes. Cached in the browser for speed.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm font-bold text-slate-600 shadow-lg backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300">
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} aria-hidden="true" />
+            {loading ? "Refreshing feeds" : "Cached live feeds"}
+          </div>
+        </motion.div>
+
+        <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+          {updateCategories.map((category) => (
+            <button
+              type="button"
+              key={category}
+              onClick={() => onCategoryChange(category)}
+              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-black transition ${
+                activeCategory === category
+                  ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-500/20"
+                  : "border-white/70 bg-white/70 text-slate-600 hover:border-blue-300 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300"
+              }`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="updates-track">
+            {[0, 1, 2].map((item) => (
+              <div className="update-skeleton" key={item} />
+            ))}
+          </div>
+        ) : (
+          <div className="updates-track">
+            {(updates.length > 0 ? updates : fallbackUpdates).map((item, index) => (
+              <motion.article
+                className="update-card premium-gradient-border p-6"
+                key={`${item.source}-${item.title}`}
+                initial={{ opacity: 0, y: 18 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.32, delay: index * 0.04 }}
+                whileHover={{ y: -6 }}
+              >
+                <div className="relative flex h-full flex-col">
+                  <div className="mb-5 flex items-center justify-between gap-3">
+                    <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-black text-white">{item.category}</span>
+                    <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400">
+                      <CalendarDays size={14} aria-hidden="true" />
+                      {formatUpdateDate(item.publishedAt)}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-black leading-tight text-slate-950 dark:text-white">{item.title}</h3>
+                  <p className="mt-4 line-clamp-4 text-sm leading-6 text-slate-600 dark:text-slate-300">{item.summary}</p>
+                  <div className="mt-auto pt-6">
+                    <div className="mb-4 inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      <Newspaper size={14} aria-hidden="true" />
+                      {item.source}
+                    </div>
+                    <Link
+                      href={item.url}
+                      target={item.url.startsWith("http") ? "_blank" : undefined}
+                      rel={item.url.startsWith("http") ? "noopener noreferrer" : undefined}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-black text-black text-decoration-none shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-blue-700 dark:bg-white dark:text-slate-950"
+                    >
+                      Read more
+                      <ArrowRight size={16} aria-hidden="true" />
+                    </Link>
+                  </div>
+                </div>
+              </motion.article>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+async function fetchFeedUpdates(feed: (typeof updateFeeds)[number]): Promise<IndustryUpdate[]> {
+  const response = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.feed)}`);
+  if (!response.ok) return [];
+  const data = (await response.json()) as {
+    items?: Array<{
+      title?: string;
+      description?: string;
+      pubDate?: string;
+      link?: string;
+      categories?: string[];
+    }>;
+  };
+
+  return (data.items ?? []).slice(0, 4).map((item) => ({
+    title: stripHtml(item.title ?? "Untitled update"),
+    summary: stripHtml(item.description ?? "Read the full update for more details.").slice(0, 180),
+    category: inferCategory(item.title ?? "", item.categories ?? [], feed.category),
+    publishedAt: item.pubDate ?? new Date().toISOString(),
+    source: feed.source,
+    url: item.link ?? feed.feed,
+  }));
+}
+
+function readUpdatesCache(cacheKey: string): IndustryUpdate[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(cacheKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as { savedAt?: number; updates?: IndustryUpdate[] };
+    const maxAgeMs = 1000 * 60 * 45;
+    if (!parsed.savedAt || Date.now() - parsed.savedAt > maxAgeMs) return [];
+    return parsed.updates ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function inferCategory(title: string, categories: string[], fallback: IndustryUpdate["category"]): IndustryUpdate["category"] {
+  const source = `${title} ${categories.join(" ")}`.toLowerCase();
+  if (/\b(chatgpt|openai|gpt)\b/.test(source)) return "ChatGPT";
+  if (/\b(gemini|bard)\b/.test(source)) return "Gemini";
+  if (/\b(ai overview|ai search|answer engine|generative)\b/.test(source)) return "AI Search";
+  if (/\b(geo|generative engine)\b/.test(source)) return "GEO";
+  if (/\b(technical|crawl|robots|schema|structured data|indexing)\b/.test(source)) return "Technical SEO";
+  if (/\b(google|core update|ranking)\b/.test(source)) return "Google Update";
+  return fallback;
+}
+
+function stripHtml(value: string): string {
+  return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function formatUpdateDate(value: string): string {
+  if (value === "Cached source") return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
 }

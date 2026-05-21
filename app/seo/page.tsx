@@ -2,24 +2,30 @@
 
 import { motion } from "framer-motion";
 import {
+  BarChart3,
   Bot,
   CheckCircle2,
+  Clock3,
   ExternalLink,
   Globe2,
+  Layers3,
   MapPin,
   Moon,
   Navigation,
+  Radar,
   Search,
   ShieldCheck,
   Sparkles,
   Sun,
+  Zap,
 } from "lucide-react";
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { SiteFooter } from "@/components/site-footer";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { SiteNavbar } from "@/components/site-navbar";
 // import { getUULE, uuleArray, getGL } from "../src/lib/uule";
 import { getUULE, getGL, uuleArray } from "@/src/lib/uule";
 
+type UuleLocation = (typeof uuleArray)[number];
 
 export default function Home() {
   const [dark, setDark] = useState(false);
@@ -27,8 +33,8 @@ export default function Home() {
   const [query, setQuery] = useState("");
   const [language, setLanguage] = useState("en");
   const [domain, setDomain] = useState("www.google.com");
-  const [suggestions, setSuggestions] = useState<any[]>([]);
   const [locationSelected, setLocationSelected] = useState(false);
+  const deferredQuery = useDeferredValue(query);
   const [pickedLocation, setPickedLocation] = useState<{
     city: string;
     countryCode: string;
@@ -41,28 +47,20 @@ export default function Home() {
       : "#f8fafc";
   }, [dark]);
 
-/* =======================
-    LOCAL SUGGESTIONS
-======================= */
-useEffect(() => {
-  // If the user hasn't typed enough or already selected a city, clear suggestions
-  if (locationSelected || query.length < 2) {
-    setSuggestions([]);
-    return;
-  }
+  const suggestions = useMemo(() => {
+    if (locationSelected || deferredQuery.length < 2) {
+      return [];
+    }
 
-  // Filter your local uule.json array based on the user's input
-  const results = uuleArray
+    return uuleArray
     .filter((item) => 
-      item.city.toLowerCase().startsWith(query.toLowerCase()) ||
-      (item.state && item.state.toLowerCase().startsWith(query.toLowerCase()))
+      item.city.toLowerCase().startsWith(deferredQuery.toLowerCase()) ||
+      (item.state && item.state.toLowerCase().startsWith(deferredQuery.toLowerCase()))
     )
-    // .slice(0, 5); // Limit to top 5 matches for UI clarity
+    .slice(0, 40);
+  }, [deferredQuery, locationSelected]);
 
-  setSuggestions(results);
-}, [query, locationSelected]);
-
-  const selectCity = (item: any) => {
+  const selectCity = (item: UuleLocation) => {
   setPickedLocation({
     city: item.city,
     countryCode: item.countryCode,
@@ -71,7 +69,6 @@ useEffect(() => {
 
   // Display the City and State from your JSON in the input field
   setQuery(`${item.city}${item.state ? `, ${item.state}` : ""}, ${item.countryCode}`);
-  setSuggestions([]);
   setLocationSelected(true);
 };
 
@@ -112,7 +109,7 @@ useEffect(() => {
           }`}
           style={{ backdropFilter: "blur(16px)", fontSize: "0.9rem" }}
         >
-          <span className="fw-bold text-warning">⚠️ Pro-Tip:</span>
+          <span className="fw-bold text-warning">Pro tip:</span>
 
           {" "}For best results, use a{" "}
           <strong>Private or Incognito Window</strong> and avoid rapid repeated
@@ -138,8 +135,29 @@ useEffect(() => {
               </div>
               <h1 className="display-4 fw-black mb-3 seo-gradient-title">Google Local SERP Checker Tool</h1>
               <p className="lead opacity-75 mb-0">
-                Simulate Google search results from any city in the world.
+                Preview localized Google results from any city with a clean, fast, SEO-grade workflow.
               </p>
+              <div className="row g-3 mt-4">
+                {[
+                  ["100k+ locations", "Global city database", Radar],
+                  ["Private SERP URLs", "No ranking account required", ShieldCheck],
+                  ["Instant preview", "Open results in one click", Zap],
+                ].map(([title, text, Icon]) => (
+                  <div className="col-md-4" key={title as string}>
+                    <motion.div
+                      className="seo-stat-badge h-100"
+                      animate={{ y: [0, -4, 0] }}
+                      transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      <div className="d-flex align-items-center gap-2 fw-black small mb-1">
+                        <Icon size={16} aria-hidden="true" />
+                        {title as string}
+                      </div>
+                      <div className="small opacity-75">{text as string}</div>
+                    </motion.div>
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="col-lg-4 text-center text-lg-end">
               <motion.button
@@ -166,13 +184,25 @@ useEffect(() => {
           whileHover={{ y: -3 }}
         >
           <div className="card-body p-4 p-md-5">
-            <div className="d-flex align-items-center gap-3 mb-4">
-              <div className="seo-icon-tile">
-                <Sparkles size={22} aria-hidden="true" />
+            <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+              <div className="d-flex align-items-center gap-3">
+                <div className="seo-icon-tile">
+                  <Sparkles size={22} aria-hidden="true" />
+                </div>
+                <div>
+                  <h2 className="h4 fw-black mb-1">Preview localized SERPs</h2>
+                  <p className="small opacity-75 mb-0">Enter a query, choose a city, and open a clean localized Google result.</p>
+                </div>
               </div>
-              <div>
-                <h2 className="h4 fw-black mb-1">Preview localized SERPs</h2>
-                <p className="small opacity-75 mb-0">Enter a query, choose a city, and open a clean localized Google result.</p>
+              <div className="d-flex flex-wrap gap-2">
+                <span className="badge rounded-pill text-bg-light border px-3 py-2">
+                  <Clock3 size={14} className="me-1" aria-hidden="true" />
+                  Fast setup
+                </span>
+                <span className="badge rounded-pill text-bg-primary px-3 py-2">
+                  <BarChart3 size={14} className="me-1" aria-hidden="true" />
+                  SEO workflow
+                </span>
               </div>
             </div>
 
@@ -247,6 +277,25 @@ useEffect(() => {
               </div>
             </div>
 
+            <div className="seo-stat-badge mb-4">
+              <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                <div className="d-flex align-items-center gap-3">
+                  <div className="seo-icon-tile">
+                    <Layers3 size={21} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <div className="fw-black">SERP preview profile</div>
+                    <div className="small opacity-75">
+                      {keyword ? keyword : "Keyword not entered"} · {pickedLocation ? `${pickedLocation.city}, ${pickedLocation.countryCode}` : "Location not selected"} · {domain}
+                    </div>
+                  </div>
+                </div>
+                <span className={`badge rounded-pill px-3 py-2 ${keyword && pickedLocation ? "text-bg-success" : "text-bg-warning"}`}>
+                  {keyword && pickedLocation ? "Ready" : "Needs keyword and location"}
+                </span>
+              </div>
+            </div>
+
             <div className="d-grid gap-2">
               <motion.button
                 className="btn btn-primary btn-lg fw-black py-3 seo-primary-cta d-inline-flex align-items-center justify-content-center gap-2"
@@ -305,9 +354,9 @@ useEffect(() => {
           transition={{ duration: 0.36 }}
         >
         <p className="mb-6 text-lg">
-          If you need to check Google search results from a different city or country, you’re in the right place. 
+          If you need to check Google search results from a different city or country, you are in the right place. 
           We built this <strong>Google Search Simulator</strong> to provide SEO professionals and business owners 
-          with a lightweight, "no-friction" way to see exactly what local customers are seeing in real-time.
+          with a lightweight, no-friction way to see exactly what local customers are seeing in real time.
         </p>
       </motion.section>
 
@@ -363,7 +412,7 @@ useEffect(() => {
       >
        
         <p className="text-lg">
-          Our tool leverages Google’s REST-style search URLs directly. By automating the math behind location 
+          Our tool leverages Google search URLs directly. By automating the math behind location 
           identifiers, we allow you to bypass IP-based tracking almost as if the query were coming from the 
           selected city itself.
         </p>
@@ -381,50 +430,39 @@ useEffect(() => {
           Pro SEO Tip
         </h3>
         <p className="text-lg">
-          For the most accurate audits, use our <strong>"Copy URL"</strong> feature and paste the link into an 
-          <strong> Incognito Window</strong>. This ensures your own search history doesn't interfere with the 
+          For the most accurate checks, open the generated SERP in an 
+          <strong> Incognito Window</strong>. This ensures your own search history does not interfere with the 
           simulated local results.
         </p>
       </motion.div>
 
-      <footer className="seo-footer mt-5">
-  <div className="row g-4 align-items-center">
-    <div className="col-md-6 text-center text-md-start">
-      <p className="small opacity-75 mb-0">
-        &copy; {new Date().getFullYear()} Local Search Simulator. All rights reserved.
-      </p>
-    </div>
-    <div className="col-md-6 text-center text-md-end">
-      <nav className="d-flex flex-wrap justify-content-center justify-content-md-end gap-3 small" aria-label="Footer navigation">
-        {/* <Link
-          href="/ai-visibility-checker"
-          className="text-decoration-none fw-bold text-primary d-inline-flex align-items-center gap-1 geo-nav-link"
-          title="Open GEO Analyzer"
-          aria-label="Open GEO Analyzer, new AI tool"
-        >
-          <Bot size={15} aria-hidden="true" />
-          GEO Analyzer
-          <span className="badge rounded-pill text-bg-primary ms-1">AI</span>
-        </Link> */}
-        <a href="/privacy" className="text-decoration-none opacity-75 hover-opacity-100 geo-nav-link">Privacy Policy</a>
-        <a href="/terms" className="text-decoration-none opacity-75 hover-opacity-100 geo-nav-link">Terms & Conditions</a>
-        <a href="/about" className="text-decoration-none opacity-75 hover-opacity-100 geo-nav-link">About</a>
-        
-      </nav>
-    </div>
-  </div>
-  
-  <div className="row mt-4">
-    <div className="col-12 text-center small opacity-50">
-      <p style={{ fontSize: '0.75rem' }}>
-        <strong>SEO Note:</strong> This tool is 
-    designed for research purposes. It simulates localized search environments to help 
-    professionals analyze international and regional search intent accurately.
-      </p>
-    </div>
-  </div>
-</footer>
+
+      <motion.section
+        className="seo-content-card mb-12"
+        initial={{ opacity: 0, y: 18 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+      >
+        <p className="text-primary fw-bold small text-uppercase mb-10">Local SEO FAQ</p>
+        <h2 className="h3 fw-black mb-4">Common questions before checking local rankings</h2>
+        <div className="row g-3 ">
+          {[
+            ["Why do rankings change by city?", "Google localizes results using intent, proximity, map data, language, and regional search behavior."],
+            ["Should I check branded and non-branded keywords?", "Yes. Branded searches show reputation and entity clarity, while non-branded searches reveal competitive discovery."],
+            ["How should I use the results?", "Use the live SERP preview to compare competitors, SERP features, map pack visibility, and localized landing page relevance."],
+          ].map(([question, answer]) => (
+            <div className="col-md-4 text-lg" key={question}>
+              <article className="seo-faq-card h-100">
+                <h3 className="h6 fw-black ">{question}</h3>
+                <p className="small opacity-75 mb-0">{answer}</p>
+              </article>
+            </div>
+          ))}
+        </div>
+      </motion.section>
+
       </div>
+      <SiteFooter />
     </main>
     </>
   );

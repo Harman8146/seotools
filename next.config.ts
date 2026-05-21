@@ -11,11 +11,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* Your existing config options here */
-  
-  experimental: {
-    serverComponentsExternalPackages: ['cheerio', 'undici'],
-  },
+  serverExternalPackages: ["cheerio", "undici"],
+  poweredByHeader: false,
+  compress: true,
 };
 
 export default nextConfig;

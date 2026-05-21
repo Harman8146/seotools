@@ -1,5 +1,8 @@
+import { SiteFooter } from "@/components/site-footer";
+
 export default function About() {
   return (
+    <>
     <main className="container py-5" style={{ maxWidth: "800px" }}>
       <h1 className="fw-bold mb-4">About Local Search Simulator</h1>
       
@@ -34,5 +37,7 @@ export default function About() {
         </div>
       </div>
     </main>
+    <SiteFooter />
+    </>
   );
 }   

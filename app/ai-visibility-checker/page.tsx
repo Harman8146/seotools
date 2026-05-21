@@ -1,24 +1,157 @@
 "use client";
 
-import { Activity, Bot, CheckCircle2, Cpu, FileSearch, Network, Sparkles, TriangleAlert } from "lucide-react";
+import { Activity, AlertCircle, BarChart3, Bot, CheckCircle2, ChevronDown, Clipboard, Cpu, Download, FileJson, FileSearch, FileText, Network, Sparkles, Target, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { SiteFooter } from "@/components/site-footer";
+import type { CSSProperties, ReactNode } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { SiteNavbar } from "@/components/site-navbar";
 
 type GeoSuggestion = {
-  priority: "high" | "medium" | "low";
+  priority: "critical" | "high" | "medium" | "low";
   category: string;
   title: string;
   recommendation: string;
+  issue?: string;
+  explanation?: string;
+  whyItMatters?: string;
+  seoImpact?: string;
+  geoImpact?: string;
+  priorityScore?: number;
+  difficulty?: string;
+};
+
+type AuditIssue = Required<Pick<GeoSuggestion, "issue" | "explanation" | "recommendation">> & {
+  priority: GeoSuggestion["priority"];
+  category: string;
+  whyItMatters: string;
+  seoImpact: string;
+  geoImpact: string;
+  priorityScore: number;
+  difficulty: string;
+  affectedUrls: string[];
+};
+
+type PageAnalysis = {
+  url: string;
+  geoScore: number;
+  aiVisibilityScore: number;
+  contentQualityScore: number;
+  technicalSeoScore: number;
+  citationProbabilityScore?: number;
+  aiTrustScore?: number;
+  aiExtractionQuality?: number;
+  contentCompletenessScore?: number;
+  topicCoverageScore?: number;
+  featuredSnippetScore?: number;
+  issueCount: number;
+  schemaCount: number;
+  wordCount: number;
+  headingStructureQuality: number;
+  aiAnswerPreview?: string;
+  searchIntent?: {
+    primaryIntent: string;
+    detectedIntents: string[];
+    mismatchWarning?: string;
+  };
+  chunkOptimization?: {
+    score: number;
+    oversizedParagraphs: number;
+    missingSubheadingSignals: number;
+    scanability: string;
+    recommendations: string[];
+  };
+  entityCoverage?: {
+    detectedEntities: string[];
+    weakEntities: string[];
+    missingEntities: string[];
+    semanticRelationships: string[];
+  };
+  topicalGaps?: {
+    missingTopics: string[];
+    missingEntities: string[];
+    missingRelationships: string[];
+  };
+  faqOpportunities?: string[];
+  readabilityHeatmap?: Array<{
+    type: string;
+    label: string;
+    text: string;
+    score: number;
+    tone: "weak" | "average" | "strong";
+    reason: string;
+  }>;
+  featuredSnippetOpportunities?: string[];
+  strengths?: string[];
+  weaknesses?: string[];
+  contentQualityScores?: {
+    headingQuality: number;
+    readability: number;
+    semanticDepth: number;
+    aiFriendliness: number;
+    geoFormatting: number;
+    contentCompleteness: number;
+  };
+  contentIssues?: Array<{
+    type: string;
+    affectedSection: string;
+    currentText: string;
+    issue: string;
+    explanation: string;
+    recommendation: string;
+    priority: "Critical" | "High" | "Medium" | "Low";
+  }>;
 };
 
 type GeoResult = {
   geoScore: number;
   strengths: string[];
   weaknesses: string[];
+  opportunities?: string[];
+  criticalIssues?: AuditIssue[];
+  aiOptimizationOpportunities?: AuditIssue[];
+  technicalImprovements?: AuditIssue[];
+  contentImprovements?: AuditIssue[];
   suggestions: GeoSuggestion[];
+  scores?: {
+    geoScore: number;
+    aiVisibilityScore: number;
+    technicalSeoScore: number;
+    contentQualityScore: number;
+    eeatScore: number;
+    aiAccessibilityScore: number;
+    citationProbabilityScore?: number;
+  };
+  advancedAnalytics?: {
+    aiAnswerPreviews: Array<{ url: string; preview: string }>;
+    citationProbability: {
+      score: number;
+      label: "High" | "Medium" | "Low";
+      factors: string[];
+    };
+    topicalGapSummary: {
+      missingTopics: string[];
+      missingEntities: string[];
+      missingRelationships: string[];
+    };
+    entityCoverageSummary: {
+      detectedEntities: string[];
+      weakEntities: string[];
+      missingEntities: string[];
+    };
+    faqOpportunities: string[];
+    intentSummary: Array<{ intent: string; pages: number }>;
+    internalLinkDepth: {
+      orphanPages: string[];
+      weaklyLinkedPages: string[];
+      depthWarnings: string[];
+    };
+    llmsTxtRecommendation: string;
+    aiCrawlerSummary: Array<{ crawler: string; status: string; recommendation: string }>;
+    exportReadySummary: string;
+  };
+  pageAnalysis?: PageAnalysis[];
   technicalFindings: {
     crawledPages: number;
     skippedByRobots: string[];
@@ -33,6 +166,10 @@ type GeoResult = {
       url: string;
       status?: number;
     };
+    aiCrawlerAccess?: Array<{ crawler: string; status: string; matchedRules: string[] }>;
+    schemaTypesDetected?: string[];
+    duplicateTitles?: string[];
+    duplicateDescriptions?: string[];
     analyzedUrls: string[];
   };
 };
@@ -59,6 +196,9 @@ export default function GeoPage() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState("");
   const [result, setResult] = useState<GeoResult | null>(null);
+  const [expandedPage, setExpandedPage] = useState<string | null>(null);
+  const [activeScorePanel, setActiveScorePanel] = useState<string>("AI Visibility Score");
+  const [expandedSuggestion, setExpandedSuggestion] = useState<string | null>(null);
   const resultsRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -135,14 +275,48 @@ export default function GeoPage() {
     }
   };
 
+  const copyReport = useCallback(async () => {
+    if (!result) return;
+    await navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+  }, [result]);
+
+  const downloadJsonReport = useCallback(() => {
+    if (!result) return;
+    downloadFile(`geo-audit-${Date.now()}.json`, JSON.stringify(result, null, 2), "application/json");
+  }, [result]);
+
+  const downloadTextReport = useCallback(() => {
+    if (!result) return;
+    const report = [
+      "AI Visibility Checker Report",
+      `GEO Score: ${result.geoScore}/100`,
+      "",
+      "Scores:",
+      ...Object.entries(result.scores ?? { geoScore: result.geoScore }).map(([key, value]) => `${formatMetric(key)}: ${value}/100`),
+      "",
+      "Top Recommendations:",
+      ...result.suggestions.map((suggestion, index) => `${index + 1}. ${suggestion.title}: ${suggestion.recommendation}`),
+    ].join("\n");
+    downloadFile(`geo-audit-${Date.now()}.txt`, report, "text/plain");
+  }, [result]);
+
+  const exportPdfReport = useCallback(() => {
+    window.print();
+  }, []);
+
+  const copyText = useCallback(async (text: string) => {
+    await navigator.clipboard.writeText(text);
+  }, []);
+
   return (
     <>
     <SiteNavbar />
-    <main className="container-fluid py-5 text-dark dark:text-light">
+    <main className="geo-premium-page container-fluid py-5 text-dark dark:text-light">
+      <div className="premium-aurora" aria-hidden="true" />
       <div className="container" style={{ maxWidth: "980px" }}>
-        <header className="mb-5">
+        <header className="geo-hero-shell mb-5">
           <Link href="/" className="text-decoration-none small fw-semibold text-primary">
-            Back to Local SERP Checker
+            Back to SEO GEO Platform
           </Link>
           <div className="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-4 mt-4">
             <div>
@@ -198,6 +372,8 @@ export default function GeoPage() {
           </div>
         </section>
 
+       
+
         <AnimatePresence>
           {loading && <LoadingSkeletons />}
         </AnimatePresence>
@@ -212,7 +388,7 @@ export default function GeoPage() {
           >
             <div className="row g-4 mb-4">
               <div className="col-md-4">
-                <div className="card h-100 border-0 shadow-sm">
+                <div className="card h-100 border-0 shadow-sm geo-dashboard-card premium-gradient-border">
                   <div className="card-body p-4">
                     <div className="d-flex align-items-center gap-2 small fw-bold text-primary mb-3">
                       <Activity size={18} aria-hidden="true" />
@@ -224,7 +400,7 @@ export default function GeoPage() {
                 </div>
               </div>
               <div className="col-md-8">
-                <div className="card h-100 border-0 shadow-sm">
+                <div className="card h-100 border-0 shadow-sm geo-dashboard-card">
                   <div className="card-body p-4">
                     <h2 className="h5 fw-bold mb-3">Technical Findings</h2>
                     <div className="row g-3 small">
@@ -238,29 +414,168 @@ export default function GeoPage() {
               </div>
             </div>
 
+            {result.scores && (
+              <div className="row g-4 mb-4">
+                {Object.entries(result.scores).map(([label, value]) => (
+                  <ScoreCard
+                    key={label}
+                    label={formatMetric(label)}
+                    value={value}
+                    active={activeScorePanel === formatMetric(label)}
+                    onClick={() => setActiveScorePanel(formatMetric(label))}
+                  />
+                ))}
+              </div>
+            )}
+
+            {result.pageAnalysis && (
+              <ScoreDrilldownPanel active={activeScorePanel} result={result} />
+            )}
+
+            {result.advancedAnalytics && (
+              <AdvancedAnalyticsPanel analytics={result.advancedAnalytics} onCopy={copyText} />
+            )}
+
+            <QuickWinsPanel result={result} onCopy={copyText} />
+
+            <div className="card border-0 shadow-sm mb-4">
+              <div className="card-body p-4">
+                <div className="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+                  <div>
+                    <h2 className="h5 fw-bold mb-1">Export Audit Report</h2>
+                    <p className="small opacity-75 mb-0">Copy, download JSON, or save a text audit summary for clients and implementation teams.</p>
+                  </div>
+                  <div className="d-flex flex-wrap gap-2">
+                    <button type="button" className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2" onClick={copyReport}>
+                      <Clipboard size={16} /> Copy Report
+                    </button>
+                    <button type="button" className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2" onClick={downloadJsonReport}>
+                      <FileJson size={16} /> JSON Export
+                    </button>
+                    <button type="button" className="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2" onClick={exportPdfReport}>
+                      <FileText size={16} /> PDF Export
+                    </button>
+                    <button type="button" className="btn btn-primary btn-sm d-inline-flex align-items-center gap-2" onClick={downloadTextReport}>
+                      <Download size={16} /> Download Report
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {result.technicalFindings.aiCrawlerAccess && (
+              <div className="card border-0 shadow-sm mb-4">
+                <div className="card-body p-4">
+                  <h2 className="h5 fw-bold mb-3">AI Crawler Accessibility</h2>
+                  <div className="d-flex flex-wrap gap-2">
+                    {result.technicalFindings.aiCrawlerAccess.map((crawler) => (
+                      <span key={crawler.crawler} className={`badge rounded-pill px-3 py-2 ${crawlerBadgeClass(crawler.status)}`}>
+                        {crawler.crawler}: {crawler.status}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="row g-4">
               <ResultList title="Strengths" items={result.strengths} tone="success" />
               <ResultList title="Weaknesses" items={result.weaknesses} tone="warning" />
             </div>
 
+            {result.opportunities && result.opportunities.length > 0 && (
+              <div className="card border-0 shadow-sm mt-4">
+                <div className="card-body p-4">
+                  <h2 className="h5 fw-bold mb-3">AI Optimization Opportunities</h2>
+                  <ul className="list-unstyled d-grid gap-2 mb-0">
+                    {result.opportunities.map((item) => (
+                      <li key={item} className="d-flex align-items-start gap-2">
+                        <Sparkles className="mt-1 text-primary" size={18} aria-hidden="true" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
             <div className="card border-0 shadow-sm mt-4">
               <div className="card-body p-4">
-                <h2 className="h5 fw-bold mb-3">Rule-Based AI Suggestions</h2>
+                <h2 className="h5 fw-bold mb-3">Smart Rule-Based Audit Issues</h2>
                 <div className="d-grid gap-3">
-                  {result.suggestions.map((suggestion) => (
-                    <article key={`${suggestion.category}-${suggestion.title}`} className="border rounded-3 p-3">
+                  {result.suggestions.map((suggestion) => {
+                    const key = `${suggestion.category}-${suggestion.title}`;
+                    const expanded = expandedSuggestion === key;
+                    return (
+                    <article key={key} className="border rounded-3 p-3 geo-action-card">
                       <div className="d-flex align-items-center gap-2 mb-2">
                         <span className={`badge rounded-pill ${badgeClass(suggestion.priority)}`}>
                           {suggestion.priority}
                         </span>
                         <strong>{suggestion.title}</strong>
+                        {suggestion.priorityScore && <span className="badge rounded-pill text-bg-light border">Priority {suggestion.priorityScore}</span>}
                       </div>
+                      {suggestion.explanation && <p className="mb-2 small">{suggestion.explanation}</p>}
+                      {suggestion.whyItMatters && <p className="mb-2 small opacity-75"><strong>Why it matters:</strong> {suggestion.whyItMatters}</p>}
+                      {(suggestion.seoImpact || suggestion.geoImpact || suggestion.difficulty) && (
+                        <div className="d-flex flex-wrap gap-2 mb-2">
+                          {suggestion.seoImpact && <span className="badge text-bg-secondary">SEO: {suggestion.seoImpact}</span>}
+                          {suggestion.geoImpact && <span className="badge text-bg-primary">GEO: {suggestion.geoImpact}</span>}
+                          {suggestion.difficulty && <span className="badge text-bg-light border">Difficulty: {suggestion.difficulty}</span>}
+                        </div>
+                      )}
                       <p className="mb-0 small opacity-75">{suggestion.recommendation}</p>
+                      <div className="d-flex flex-wrap gap-2 mt-3">
+                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => copyText(suggestion.recommendation)}>
+                          Copy Suggestion
+                        </button>
+                        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setExpandedSuggestion(expanded ? null : key)}>
+                          {expanded ? "Hide Details" : "Why This Matters"}
+                        </button>
+                      </div>
+                      <AnimatePresence initial={false}>
+                        {expanded && (
+                          <motion.div
+                            className="geo-recommendation-detail mt-3"
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -6 }}
+                            transition={{ duration: 0.18 }}
+                          >
+                            <strong>AI impact:</strong> Clearer structure improves answer extraction, citation confidence, and user engagement.
+                            <br />
+                            <strong>Implementation:</strong> Apply this fix on the affected page, then rerun the audit to track progress.
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </article>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
+
+            {result.pageAnalysis && result.pageAnalysis.length > 0 && (
+              <div className="card border-0 shadow-sm mt-4">
+                <div className="card-body p-4">
+                  <h2 className="h5 fw-bold mb-2">Page-Level & Content-Block Analysis</h2>
+                  <p className="small opacity-75 mb-4">
+                    Expand each page to see weak headings, thin paragraphs, missing sections, semantic gaps, and exact GEO improvement tips.
+                  </p>
+                  <div className="d-grid gap-3">
+                    {result.pageAnalysis.map((page) => (
+                      <PageAuditCard
+                        key={page.url}
+                        page={page}
+                        expanded={expandedPage === page.url}
+                        onToggle={() => setExpandedPage((current) => (current === page.url ? null : page.url))}
+                        onCopy={copyText}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.section>
         )}
 
@@ -274,26 +589,21 @@ export default function GeoPage() {
           )}
         </AnimatePresence>
 
-        <footer className="mt-5 pt-5 border-top">
-          <nav className="d-flex flex-wrap justify-content-center gap-3 small" aria-label="Footer navigation">
-            <Link href="/" className="text-decoration-none opacity-75 geo-nav-link">
-              SERP Checker
-            </Link>
-            {/* <Link href="/ai-visibility-checker" aria-current="page" className="text-decoration-none fw-bold text-primary geo-nav-link">
-              <Bot size={15} aria-hidden="true" /> GEO Analyzer <span className="badge rounded-pill text-bg-primary ms-1">AI</span>
-            </Link> */}
-            <Link href="/privacy" className="text-decoration-none opacity-75 geo-nav-link">
-              Privacy Policy
-            </Link>
-            <Link href="/terms" className="text-decoration-none opacity-75 geo-nav-link">
-              Terms & Conditions
-            </Link>
-            <Link href="/about" className="text-decoration-none opacity-75 geo-nav-link">
-              About
-            </Link>
-          </nav>
-        </footer>
       </div>
+      <br></br>
+      <br></br>
+      <br></br>
+      <br></br>
+      <br></br>
+      <br></br>
+      <br></br>
+
+      <br></br>
+      <br></br>
+      <br></br>
+      <br></br>
+      <br></br>
+      <SiteFooter />
     </main>
     </>
   );
@@ -330,7 +640,7 @@ function GeoLoadingModal({ progress, status, success }: { progress: number; stat
             </div>
           </div>
 
-          <div className="text-center">
+          {/* <div className="text-center">
             <h2 id="geo-loading-title" className="h3 fw-bold mb-3">
               Analyzing Website GEO Score
             </h2>
@@ -343,7 +653,7 @@ function GeoLoadingModal({ progress, status, success }: { progress: number; stat
               implementation, entity optimization, content readability, and technical SEO signals to generate a
               comprehensive AI visibility score and actionable optimization recommendations.
             </p>
-          </div>
+          </div> */}
 
           <div className="geo-status-card mb-4">
             <div className="d-flex align-items-center gap-3">
@@ -389,6 +699,141 @@ function GeoLoadingModal({ progress, status, success }: { progress: number; stat
         </div>
       </motion.div>
     </motion.div>
+  );
+}
+
+const AdvancedAnalyticsPanel = memo(function AdvancedAnalyticsPanel({ analytics, onCopy }: { analytics: NonNullable<GeoResult["advancedAnalytics"]>; onCopy: (text: string) => void }) {
+  return (
+    <div className="d-grid gap-4 mb-4">
+      <div className="card border-0 shadow-sm">
+        <div className="card-body p-4">
+          <div className="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+            <div>
+              <div className="d-inline-flex align-items-center gap-2 small fw-bold text-primary mb-2">
+                <BarChart3 size={18} aria-hidden="true" />
+                Advanced GEO Intelligence
+              </div>
+              <h2 className="h5 fw-bold mb-1">AI Citation, Intent, Entity & Topical Gap Analysis</h2>
+              <p className="small opacity-75 mb-0">{analytics.exportReadySummary}</p>
+            </div>
+            <div className="geo-citation-meter">
+              <span className="small fw-bold opacity-75">Citation Probability</span>
+              <strong>{analytics.citationProbability.score}%</strong>
+              <span className={`badge rounded-pill ${analytics.citationProbability.label === "High" ? "text-bg-success" : analytics.citationProbability.label === "Medium" ? "text-bg-warning" : "text-bg-danger"}`}>
+                {analytics.citationProbability.label}
+              </span>
+            </div>
+          </div>
+
+          <div className="row g-3">
+            <div className="col-lg-6">
+              <InsightBox title="AI Answer Previews" icon={<Sparkles size={18} />}>
+                <div className="d-grid gap-3">
+                  {analytics.aiAnswerPreviews.map((item) => (
+                    <div className="geo-insight-item" key={item.url}>
+                      <div className="small fw-bold text-primary text-break mb-1">{item.url}</div>
+                      <p className="small mb-0">{item.preview}</p>
+                    </div>
+                  ))}
+                </div>
+              </InsightBox>
+            </div>
+            <div className="col-lg-6">
+              <InsightBox title="Citation Factors" icon={<Target size={18} />}>
+                <MiniList title="Signals affecting AI citation potential" items={analytics.citationProbability.factors} tone="success" />
+              </InsightBox>
+            </div>
+          </div>
+
+          <div className="row g-3 mt-1">
+            <div className="col-lg-4">
+              <InsightBox title="Topical Gaps" icon={<AlertCircle size={18} />}>
+                <TagList items={analytics.topicalGapSummary.missingTopics} empty="No major topic gaps detected." tone="warning" />
+              </InsightBox>
+            </div>
+            <div className="col-lg-4">
+              <InsightBox title="Entity Coverage" icon={<Network size={18} />}>
+                <TagList items={analytics.entityCoverageSummary.detectedEntities} empty="No clear entities detected." tone="success" />
+                <div className="mt-3">
+                  <div className="small fw-bold mb-2">Weak or Missing Entities</div>
+                  <TagList items={[...analytics.entityCoverageSummary.weakEntities, ...analytics.entityCoverageSummary.missingEntities].slice(0, 10)} empty="Entity coverage looks solid." tone="warning" />
+                </div>
+              </InsightBox>
+            </div>
+            <div className="col-lg-4">
+              <InsightBox title="Search Intent" icon={<FileSearch size={18} />}>
+                <div className="d-grid gap-2">
+                  {analytics.intentSummary.map((item) => (
+                    <div className="d-flex align-items-center justify-content-between border rounded-3 p-2 small" key={item.intent}>
+                      <strong>{item.intent}</strong>
+                      <span className="badge text-bg-light border">{item.pages} page{item.pages === 1 ? "" : "s"}</span>
+                    </div>
+                  ))}
+                </div>
+              </InsightBox>
+            </div>
+          </div>
+
+          <div className="row g-3 mt-1">
+            <div className="col-lg-6">
+              <InsightBox title="FAQ Opportunity Generator" icon={<Clipboard size={18} />}>
+                <ol className="small mb-0 d-grid gap-2">
+                  {analytics.faqOpportunities.slice(0, 8).map((question) => (
+                    <li key={question} className="geo-faq-opportunity">
+                      <span>{question}</span>
+                      <button type="button" className="btn btn-sm btn-light border" onClick={() => onCopy(question)}>
+                        Copy
+                      </button>
+                    </li>
+                  ))}
+                </ol>
+              </InsightBox>
+            </div>
+            <div className="col-lg-6">
+              <InsightBox title="Internal Link Depth" icon={<Network size={18} />}>
+                <MiniList title="Weakly linked pages" items={analytics.internalLinkDepth.weaklyLinkedPages.slice(0, 6)} tone="warning" />
+                <div className="mt-3">
+                  <MiniList title="Depth warnings" items={analytics.internalLinkDepth.depthWarnings} tone="warning" />
+                </div>
+              </InsightBox>
+            </div>
+          </div>
+
+          <details className="geo-llms-box mt-3">
+            <summary className="fw-bold">Recommended llms.txt</summary>
+            <pre className="mb-0 mt-3">{analytics.llmsTxtRecommendation}</pre>
+          </details>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+function InsightBox({ title, icon, children }: { title: string; icon: ReactNode; children: ReactNode }) {
+  return (
+    <div className="geo-insight-box h-100">
+      <div className="d-flex align-items-center gap-2 fw-bold mb-3">
+        {icon}
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function TagList({ items, empty, tone }: { items: string[]; empty: string; tone: "success" | "warning" }) {
+  if (items.length === 0) {
+    return <p className="small opacity-75 mb-0">{empty}</p>;
+  }
+
+  return (
+    <div className="d-flex flex-wrap gap-2">
+      {items.map((item) => (
+        <span className={`badge rounded-pill ${tone === "success" ? "text-bg-success" : "text-bg-warning"}`} key={item}>
+          {item}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -441,7 +886,371 @@ function Finding({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ResultList({ title, items, tone }: { title: string; items: string[]; tone: "success" | "warning" }) {
+function ScoreDrilldownPanel({ active, result }: { active: string; result: GeoResult }) {
+  const pages = result.pageAnalysis ?? [];
+  const issues = pages.flatMap((page) => page.contentIssues ?? []);
+  const details = getScoreDrilldown(active, result, pages, issues);
+
+  return (
+    <motion.div className="card border-0 shadow-sm mb-4 geo-drilldown-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+      <div className="card-body p-4">
+        <div className="d-flex flex-column flex-lg-row justify-content-between gap-3">
+          <div>
+            <div className="small fw-bold text-primary mb-1">Interactive Score Drilldown</div>
+            <h2 className="h5 fw-bold mb-2">{active}</h2>
+            <p className="small opacity-75 mb-0">{details.summary}</p>
+          </div>
+          <div className="geo-completion-meter">
+            <strong>{details.score}%</strong>
+            <span>optimization complete</span>
+          </div>
+        </div>
+        <div className="row g-3 mt-3">
+          {details.items.map((item) => (
+            <div className="col-md-4" key={item.title}>
+              <div className="geo-mini-action h-100">
+                <div className="fw-bold mb-2">{item.title}</div>
+                <p className="small mb-0">{item.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function QuickWinsPanel({ result, onCopy }: { result: GeoResult; onCopy: (text: string) => void }) {
+  const wins = buildQuickWins(result);
+
+  return (
+    <div className="card border-0 shadow-sm mb-4 geo-quickwins-panel">
+      <div className="card-body p-4">
+        <div className="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+          <div>
+            <div className="small fw-bold text-primary mb-1">Action Plan</div>
+            <h2 className="h5 fw-bold mb-1">Top AI Visibility Quick Wins</h2>
+            <p className="small opacity-75 mb-0">Short, high-impact fixes designed to improve answer extraction, trust, and GEO readiness.</p>
+          </div>
+          <span className="badge rounded-pill text-bg-primary align-self-start px-3 py-2">{wins.length} quick wins</span>
+        </div>
+        <div className="row g-3">
+          {wins.map((win, index) => (
+            <div className="col-md-6" key={win.title}>
+              <details className="geo-quickwin-card">
+                <summary>
+                  <span className="geo-step-number">{index + 1}</span>
+                  <strong>{win.title}</strong>
+                </summary>
+                <p>{win.detail}</p>
+                <div className="geo-example-box">
+                  <strong>Example:</strong> {win.example}
+                </div>
+                <button type="button" className="btn btn-sm btn-outline-primary mt-3" onClick={() => onCopy(`${win.title}: ${win.detail}`)}>
+                  Copy Quick Fix
+                </button>
+              </details>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const ScoreCard = memo(function ScoreCard({ label, value, active, onClick }: { label: string; value: number; active: boolean; onClick: () => void }) {
+  return (
+    <div className="col-md-4">
+      <motion.button
+        type="button"
+        className={`card h-100 w-100 border-0 shadow-sm geo-dashboard-card premium-gradient-border text-start ${active ? "geo-score-card-active" : ""}`}
+        whileHover={{ y: -5 }}
+        onClick={onClick}
+      >
+        <div className="card-body p-4 position-relative">
+          <div className="d-flex align-items-center justify-content-between gap-3 mb-3">
+            <div>
+              <h3 className="h6 fw-bold mb-1">{label}</h3>
+              <div className="small opacity-75">{scoreLabel(value)}</div>
+            </div>
+            <motion.div
+              className="geo-score-ring fw-black"
+              style={{ "--score": value } as CSSProperties}
+              initial={{ scale: 0.92, opacity: 0 }}
+              whileInView={{ scale: 1, opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.35 }}
+            >
+              {value}
+            </motion.div>
+          </div>
+          <div className="geo-progress-track">
+            <div className="geo-progress-fill" style={{ width: `${value}%` }} />
+          </div>
+          <div className="small fw-bold text-primary mt-3">Click to explore issues</div>
+        </div>
+      </motion.button>
+    </div>
+  );
+});
+
+const PageAuditCard = memo(function PageAuditCard({ page, expanded, onToggle, onCopy }: { page: PageAnalysis; expanded: boolean; onToggle: () => void; onCopy: (text: string) => void }) {
+  const scores = page.contentQualityScores;
+  const issues = page.contentIssues ?? [];
+
+  return (
+    <motion.article className="border rounded-4 p-3 bg-white bg-opacity-75">
+      <button
+        type="button"
+        className="btn w-100 p-0 text-start border-0"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        <div className="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+          <div>
+            <div className="small fw-bold text-primary mb-1 text-break">{page.url}</div>
+            <div className="d-flex flex-wrap gap-2 small">
+              <span className="badge text-bg-light border">Issues: {page.issueCount}</span>
+              <span className="badge text-bg-light border">Words: {page.wordCount}</span>
+              <span className="badge text-bg-light border">Schema: {page.schemaCount}</span>
+            </div>
+          </div>
+          <div className="d-flex flex-wrap align-items-center gap-2">
+            <ScorePill value={page.geoScore} />
+            <span className="small opacity-75">GEO</span>
+            <ScorePill value={page.aiVisibilityScore} />
+            <span className="small opacity-75">AI</span>
+            {page.citationProbabilityScore !== undefined && (
+              <>
+                <ScorePill value={page.citationProbabilityScore} />
+                <span className="small opacity-75">Citation</span>
+              </>
+            )}
+            <ChevronDown className={expanded ? "geo-chevron-open" : ""} size={18} aria-hidden="true" />
+          </div>
+        </div>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.24 }}
+            className="overflow-hidden"
+          >
+            <div className="pt-4">
+              {page.aiAnswerPreview && (
+                <div className="geo-ai-preview mb-4">
+                  <div className="small fw-bold text-primary mb-2">AI Answer Preview</div>
+                  <p className="mb-0">{page.aiAnswerPreview}</p>
+                </div>
+              )}
+
+              {scores && (
+                <div className="row g-3 mb-4">
+                  {Object.entries(scores).map(([label, value]) => (
+                    <div className="col-md-4" key={label}>
+                      <div className="border rounded-3 p-3 h-100">
+                        <div className="small fw-bold mb-2">{formatMetric(label)}</div>
+                        <div className="d-flex align-items-center gap-2">
+                          <ScorePill value={value} />
+                          <div className="geo-progress-track flex-grow-1">
+                            <div className="geo-progress-fill" style={{ width: `${value}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="row g-3 mb-4">
+                {[
+                  ["Citation Probability", page.citationProbabilityScore],
+                  ["AI Trust", page.aiTrustScore],
+                  ["AI Extraction", page.aiExtractionQuality],
+                  ["Content Completeness", page.contentCompletenessScore],
+                  ["Topic Coverage", page.topicCoverageScore],
+                  ["Featured Snippet", page.featuredSnippetScore],
+                ].filter(([, value]) => typeof value === "number").map(([label, value]) => (
+                  <div className="col-md-4" key={String(label)}>
+                    <div className="border rounded-3 p-3 h-100">
+                      <div className="small fw-bold mb-2">{label}</div>
+                      <ScorePill value={Number(value)} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="row g-3 mb-4">
+                {page.searchIntent && (
+                  <div className="col-lg-4">
+                    <InsightBox title="AI Search Intent" icon={<Target size={18} />}>
+                      <div className="d-flex flex-wrap gap-2 mb-2">
+                        {page.searchIntent.detectedIntents.map((intent) => (
+                          <span className="badge text-bg-primary" key={intent}>{intent}</span>
+                        ))}
+                      </div>
+                      {page.searchIntent.mismatchWarning && <p className="small text-warning-emphasis mb-0">{page.searchIntent.mismatchWarning}</p>}
+                    </InsightBox>
+                  </div>
+                )}
+                {page.chunkOptimization && (
+                  <div className="col-lg-4">
+                    <InsightBox title="AI Chunk Optimization" icon={<Cpu size={18} />}>
+                      <div className="d-flex align-items-center gap-2 mb-2">
+                        <ScorePill value={page.chunkOptimization.score} />
+                        <span className="small">{page.chunkOptimization.scanability} scanability</span>
+                      </div>
+                      <MiniList title="Chunk fixes" items={page.chunkOptimization.recommendations} tone="warning" />
+                    </InsightBox>
+                  </div>
+                )}
+                {page.entityCoverage && (
+                  <div className="col-lg-4">
+                    <InsightBox title="Entity Coverage" icon={<Network size={18} />}>
+                      <TagList items={page.entityCoverage.detectedEntities.slice(0, 8)} empty="No entities detected." tone="success" />
+                      <div className="mt-3">
+                        <TagList items={[...page.entityCoverage.weakEntities, ...page.entityCoverage.missingEntities].slice(0, 8)} empty="No weak entities detected." tone="warning" />
+                      </div>
+                    </InsightBox>
+                  </div>
+                )}
+              </div>
+
+              {(page.topicalGaps || page.faqOpportunities || page.featuredSnippetOpportunities) && (
+                <div className="row g-3 mb-4">
+                  <div className="col-lg-4">
+                    <InsightBox title="Topical Gap Analysis" icon={<AlertCircle size={18} />}>
+                      <TagList items={page.topicalGaps?.missingTopics ?? []} empty="No major missing topics." tone="warning" />
+                    </InsightBox>
+                  </div>
+                  <div className="col-lg-4">
+                    <InsightBox title="FAQ Opportunities" icon={<Clipboard size={18} />}>
+                      <MiniList title="Suggested FAQs" items={page.faqOpportunities ?? []} tone="success" />
+                    </InsightBox>
+                  </div>
+                  <div className="col-lg-4">
+                    <InsightBox title="Snippet Optimization" icon={<FileText size={18} />}>
+                      <MiniList title="Recommended formats" items={page.featuredSnippetOpportunities ?? []} tone="success" />
+                    </InsightBox>
+                  </div>
+                </div>
+              )}
+
+              {page.readabilityHeatmap && page.readabilityHeatmap.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="h6 fw-bold mb-3">AI Readability Heatmap</h3>
+                  <div className="geo-heatmap-grid">
+                    {page.readabilityHeatmap.map((item, index) => (
+                      <div className={`geo-heatmap-item geo-heatmap-${item.tone}`} key={`${item.label}-${index}`}>
+                        <div className="d-flex align-items-center justify-content-between gap-2 mb-2">
+                          <strong className="small">{item.label}</strong>
+                          <ScorePill value={item.score} />
+                        </div>
+                        <p className="small mb-2">{item.text}</p>
+                        <div className="small opacity-75">{item.reason}</div>
+                        <details className="mt-2">
+                          <summary className="small fw-bold">Show quick fix</summary>
+                          <p className="small mb-0 mt-2">{buildHeatmapFix(item.type, item.tone)}</p>
+                        </details>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="row g-3 mb-4">
+                <div className="col-md-6">
+                  <MiniList title="Page Strengths" items={page.strengths ?? []} tone="success" />
+                </div>
+                <div className="col-md-6">
+                  <MiniList title="Page Weaknesses" items={page.weaknesses ?? []} tone="warning" />
+                </div>
+              </div>
+
+              <h3 className="h6 fw-bold mb-3">Weak Content Blocks & Fixes</h3>
+              <div className="d-grid gap-3">
+                {issues.length > 0 ? (
+                  issues.map((issue, index) => (
+                    <div key={`${issue.affectedSection}-${issue.issue}-${index}`} className={`geo-content-issue geo-content-issue-${issue.priority.toLowerCase()}`}>
+                      <div className="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <AlertCircle size={18} aria-hidden="true" />
+                        <span className={`badge rounded-pill ${contentPriorityClass(issue.priority)}`}>{issue.priority}</span>
+                        <strong>{issue.type}</strong>
+                        <span className="small opacity-75">{issue.affectedSection}</span>
+                      </div>
+                      <div className="geo-highlight-block mb-2">{issue.currentText}</div>
+                      <p className="small mb-2"><strong>Issue:</strong> {issue.issue}</p>
+                      <p className="small mb-2"><strong>Why it is weak:</strong> {issue.explanation}</p>
+                      <p className="small mb-0"><strong>How to improve:</strong> {issue.recommendation}</p>
+                      <div className="geo-example-box mt-3">
+                        <strong>Improved example:</strong> {buildIssueExample(issue)}
+                      </div>
+                      <div className="d-flex flex-wrap gap-2 mt-3">
+                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => onCopy(buildIssueExample(issue))}>
+                          Copy Example
+                        </button>
+                        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onCopy(issue.recommendation)}>
+                          Copy Recommendation
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="small opacity-75 mb-0">No major content-block issues detected for this page.</p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        
+      </AnimatePresence>
+      
+    </motion.article>
+
+
+
+  );
+
+  
+});
+
+const MiniList = memo(function MiniList({ title, items, tone }: { title: string; items: string[]; tone: "success" | "warning" }) {
+  return (
+    <div className="border rounded-3 p-3 h-100">
+      <div className="fw-bold small mb-2">{title}</div>
+      {items.length > 0 ? (
+        <ul className="list-unstyled d-grid gap-2 mb-0 small">
+          {items.map((item) => (
+            <li className="d-flex gap-2" key={item}>
+              <CheckCircle2 className={`mt-1 text-${tone}`} size={16} aria-hidden="true" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="small opacity-75 mb-0">No items detected.</p>
+      )}
+    </div>
+  );
+});
+
+function ScorePill({ value }: { value: number }) {
+  return <span className={`badge rounded-pill ${value >= 80 ? "text-bg-success" : value >= 60 ? "text-bg-warning" : "text-bg-danger"}`}>{value}</span>;
+}
+
+function scoreLabel(value: number): string {
+  if (value >= 85) return "Enterprise-ready";
+  if (value >= 70) return "Strong signal";
+  if (value >= 55) return "Needs refinement";
+  return "High priority";
+}
+
+const ResultList = memo(function ResultList({ title, items, tone }: { title: string; items: string[]; tone: "success" | "warning" }) {
   return (
     <div className="col-md-6">
       <div className="card h-100 border-0 shadow-sm">
@@ -463,10 +1272,165 @@ function ResultList({ title, items, tone }: { title: string; items: string[]; to
       </div>
     </div>
   );
+
+  
+});
+
+function getScoreDrilldown(active: string, result: GeoResult, pages: PageAnalysis[], issues: NonNullable<PageAnalysis["contentIssues"]>) {
+  const score = Math.round(result.scores?.[metricKey(active) as keyof NonNullable<GeoResult["scores"]>] ?? result.geoScore);
+  const weakPages = pages.filter((page) => page.geoScore < 75).slice(0, 3);
+  const semanticIssues = issues.filter((issue) => /heading|semantic|paragraph|format|faq/i.test(`${issue.type} ${issue.issue}`)).slice(0, 3);
+
+  if (/AI Visibility/i.test(active)) {
+    return {
+      score,
+      summary: "Focus on semantic clarity, answer extraction, FAQ quality, content chunking, and entity coverage.",
+      items: [
+        { title: "Answer Extraction", text: `${semanticIssues.length || 0} content blocks can be rewritten as clearer answer-ready sections.` },
+        { title: "Chunking", text: "Use short sections, lists, FAQs, and tables so AI systems can retrieve precise passages." },
+        { title: "Entity Clarity", text: "Make brand, service, product, and location entities explicit in headings and body copy." },
+      ],
+    };
+  }
+  if (/Technical SEO/i.test(active)) {
+    return {
+      score,
+      summary: "Technical signals help crawlers access, interpret, and consolidate your best pages.",
+      items: [
+        { title: "Crawl Health", text: `${result.technicalFindings.failedPages.length} failed page(s) and ${result.technicalFindings.skippedByRobots.length} robots-blocked URL(s) found.` },
+        { title: "Metadata", text: "Review canonical, meta descriptions, Open Graph, and image alt text on weak pages." },
+        { title: "AI Access", text: "Check robots.txt and llms.txt so AI crawlers can identify your useful public content." },
+      ],
+    };
+  }
+  if (/Content Quality|Citation/i.test(active)) {
+    return {
+      score,
+      summary: "Citation probability improves when content is complete, specific, transparent, and easy to quote.",
+      items: [
+        { title: "Completeness", text: "Add pricing, comparisons, examples, local context, and proof where missing." },
+        { title: "Trust", text: "Show contact details, policies, reviews, authorship, or organization schema." },
+        { title: "Weak Pages", text: weakPages.length ? weakPages.map((page) => page.url).join(", ") : "No major weak pages detected." },
+      ],
+    };
+  }
+  return {
+    score,
+    summary: "Use this panel as a guided checklist for the clicked score area.",
+    items: [
+      { title: "Quick Review", text: "Open page-level analysis to inspect weak headings, thin paragraphs, and semantic gaps." },
+      { title: "Prioritize", text: "Start with high-impact issues that affect crawlability, answer extraction, and trust." },
+      { title: "Track Progress", text: "Apply fixes and rerun the audit to measure score movement." },
+    ],
+  };
 }
 
+function buildQuickWins(result: GeoResult): Array<{ title: string; detail: string; example: string }> {
+  const suggestions = result.suggestions ?? [];
+  const hasFaq = suggestions.some((item) => /faq/i.test(item.title));
+  const hasSchema = suggestions.some((item) => /schema|structured/i.test(item.title));
+  const hasHeading = suggestions.some((item) => /heading|structure/i.test(item.title));
+  const wins = [
+    hasFaq && {
+      title: "Add buyer-intent FAQ sections",
+      detail: "Add 4-6 realistic customer questions around delivery, pricing, timing, comparisons, trust, and local availability.",
+      example: "Do you offer same-day delivery in this city?",
+    },
+    hasSchema && {
+      title: "Add or improve FAQ and organization schema",
+      detail: "Expose page meaning with valid JSON-LD so search and AI systems can classify your content more confidently.",
+      example: "Add FAQPage, Organization, LocalBusiness, BreadcrumbList, or Product schema where relevant.",
+    },
+    hasHeading && {
+      title: "Rewrite generic headings",
+      detail: "Replace vague headings with descriptive headings that include the service, product, location, or user intent.",
+      example: "Change 'Our Services' to 'Same-Day Flower Delivery Services in Milton'.",
+    },
+    {
+      title: "Add comparison or pricing context",
+      detail: "AI answer engines prefer content that helps users make decisions quickly without guessing.",
+      example: "Add a simple table comparing delivery options, timelines, fees, or product categories.",
+    },
+    {
+      title: "Strengthen internal links",
+      detail: "Link high-value service, FAQ, contact, collection, and location pages together to improve topical authority.",
+      example: "Link from product/category pages to delivery policy, FAQs, and local service pages.",
+    },
+    {
+      title: "Add trust and E-E-A-T signals",
+      detail: "Show contact details, reviews, business policies, authorship, experience, and transparent service information.",
+      example: "Add a short trust block: delivery area, support hours, returns policy, and verified reviews.",
+    },
+  ].filter(Boolean) as Array<{ title: string; detail: string; example: string }>;
+
+  return wins.slice(0, 6);
+}
+
+function metricKey(label: string): string {
+  return label.charAt(0).toLowerCase() + label.slice(1).replace(/\s+(.)/g, (_, letter: string) => letter.toUpperCase());
+}
+
+function buildIssueExample(issue: NonNullable<PageAnalysis["contentIssues"]>[number]): string {
+  if (/heading/i.test(issue.type)) {
+    return "Use a specific heading that names the service, product, location, or customer intent, such as 'Same-Day Flower Delivery in Milton' instead of a generic label.";
+  }
+  if (/paragraph/i.test(issue.type)) {
+    return "Rewrite as a 45-80 word answer block that states the main topic, who it helps, the key detail, and the next step for the reader.";
+  }
+  if (/faq/i.test(issue.type)) {
+    return "Add realistic questions customers ask before buying, booking, comparing, scheduling, or trusting the business.";
+  }
+  if (/table|missing/i.test(issue.type)) {
+    return "Add a compact table comparing options, timing, pricing signals, service areas, or product categories.";
+  }
+  return "Create a concise, specific content block with one clear answer, supporting details, and an action-oriented next step.";
+}
+
+function buildHeatmapFix(type: string, tone: string): string {
+  if (tone === "strong") return "This block is already AI-friendly. Keep it concise, specific, and close to the related heading.";
+  if (/heading/i.test(type)) return "Rewrite the heading so it clearly names the topic, service, product, location, or question being answered.";
+  if (/paragraph/i.test(type)) return "Split or expand this into a self-contained answer paragraph with concrete details and one clear takeaway.";
+  return "Improve scanability with a concise heading, bullet list, table, or direct answer format.";
+}
+
+
+
 function badgeClass(priority: GeoSuggestion["priority"]): string {
+  if (priority === "critical") return "text-bg-danger";
   if (priority === "high") return "text-bg-danger";
   if (priority === "medium") return "text-bg-warning";
   return "text-bg-secondary";
+}
+
+function crawlerBadgeClass(status: string): string {
+  if (status === "allowed") return "text-bg-success";
+  if (status === "blocked") return "text-bg-danger";
+  return "text-bg-warning";
+}
+
+function contentPriorityClass(priority: "Critical" | "High" | "Medium" | "Low"): string {
+  if (priority === "Critical") return "text-bg-danger";
+  if (priority === "High") return "text-bg-danger";
+  if (priority === "Medium") return "text-bg-warning";
+  return "text-bg-secondary";
+}
+
+function formatMetric(value: string): string {
+  return value
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (letter) => letter.toUpperCase())
+    .replace("Geo", "GEO")
+    .replace("Ai", "AI")
+    .replace("Seo", "SEO")
+    .trim();
+}
+
+function downloadFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
