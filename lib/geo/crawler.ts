@@ -18,6 +18,7 @@ export type ExtractedPage = {
   robotsMeta: string;
   jsonLd: unknown[];
   schemaTypes: string[];
+  schemaDetection: SchemaDetectionResult;
   tables: string[];
   lists: string[];
   paragraphs: string[];
@@ -36,6 +37,32 @@ export type ExtractedPage = {
   externalLinks: string[];
   textContent: string;
   wordCount: number;
+};
+
+export type SchemaDetectionResult = {
+  schemaDetected: boolean;
+  schemaTypes: string[];
+  schemaCount: number;
+  faqSchema: boolean;
+  organizationSchema: boolean;
+  productSchema: boolean;
+  localBusinessSchema: boolean;
+  breadcrumbSchema: boolean;
+  articleSchema: boolean;
+  websiteSchema: boolean;
+  serviceSchema: boolean;
+  personSchema: boolean;
+  reviewSchema: boolean;
+  aggregateRatingSchema: boolean;
+  jsonLdBlocks: number;
+  jsonLdValidBlocks: number;
+  jsonLdInvalidBlocks: number;
+  microdataItems: number;
+  rdfaItems: number;
+  invalidSchemaWarnings: string[];
+  incompleteFields: string[];
+  missingRecommendedSchema: string[];
+  recommendations: string[];
 };
 
 export type CrawlTechnicalFindings = {
@@ -108,6 +135,19 @@ const MAX_HTML_BYTES = 1_500_000;
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 GEOAuditBot/1.0";
+const COMMON_SCHEMA_TYPES = [
+  "FAQPage",
+  "LocalBusiness",
+  "Product",
+  "Article",
+  "BreadcrumbList",
+  "Organization",
+  "WebSite",
+  "Service",
+  "Person",
+  "Review",
+  "AggregateRating",
+];
 
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
 
@@ -161,6 +201,7 @@ export async function crawlGeoSite(inputUrl: string): Promise<GeoCrawlResult> {
       }
 
       const html = await readLimitedText(response);
+      debugSchemaLog("Fetched HTML", { url: current, length: html.length });
       const extracted = extractPageData(current, html, origin);
       extracted.status = response.status;
       pages.push(extracted);
@@ -204,6 +245,11 @@ export async function crawlGeoSite(inputUrl: string): Promise<GeoCrawlResult> {
 function extractPageData(url: string, html: string, origin: string): ExtractedPage {
   const $ = cheerio.load(html) as unknown as CheerioRoot;
 
+  const schemaDetection = detectSchemaMarkup($, html, url);
+  const jsonLd = schemaDetectionJsonLd($, html);
+  const schemaMarkup = extractSemanticSchemaMarkup($);
+  const schemaTypes = Array.from(new Set([...schemaDetection.schemaTypes, ...extractSchemaTypes(jsonLd, schemaMarkup)])).sort();
+
   $("script, style, noscript, svg, canvas, iframe").remove();
 
   const title = cleanText($("title").first().text());
@@ -219,18 +265,6 @@ function extractPageData(url: string, html: string, origin: string): ExtractedPa
       text: cleanText($(element).text()),
     }))
     .filter((heading: Heading) => heading.text.length > 0);
-
-  const schemaMarkup = $('[itemscope], [itemtype], [typeof], [property^="schema:"]')
-    .toArray()
-    .map((element) => cleanText($(element).attr("itemtype") ?? $(element).attr("typeof") ?? $(element).text()))
-    .filter((value: string) => Boolean(value))
-    .slice(0, 50);
-
-  const jsonLd = $('script[type="application/ld+json"]')
-    .toArray()
-    .map((element) => parseJsonLd($(element).html() ?? ""))
-    .filter((value): value is unknown => value !== null);
-  const schemaTypes = extractSchemaTypes(jsonLd, schemaMarkup);
 
   const faqContent = extractFaqContent($);
   const internalLinks = extractInternalLinks($, url, origin);
@@ -267,6 +301,7 @@ function extractPageData(url: string, html: string, origin: string): ExtractedPa
     robotsMeta,
     jsonLd,
     schemaTypes,
+    schemaDetection: { ...schemaDetection, schemaTypes, schemaCount: schemaTypes.length, schemaDetected: schemaTypes.length > 0 || schemaMarkup.length > 0 },
     tables,
     lists,
     paragraphs,
@@ -413,6 +448,11 @@ async function fetchWithTimeout(url: string, options: { timeoutMs: number }): Pr
         "User-Agent": USER_AGENT,
         Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,text/plain;q=0.8,*/*;q=0.7",
         "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Sec-CH-UA": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": '"Windows"',
+        "Upgrade-Insecure-Requests": "1",
       },
       cache: "no-store",
       credentials: "omit",
@@ -490,6 +530,159 @@ function extractMetaMap($: CheerioRoot, selector: string, keyAttribute: "name" |
   return values;
 }
 
+function detectSchemaMarkup($: CheerioRoot, html: string, pageUrl: string): SchemaDetectionResult {
+  const warnings: string[] = [];
+  const incompleteFields: string[] = [];
+  const jsonLdItems = schemaDetectionJsonLd($, html, warnings);
+  const semanticMarkup = extractSemanticSchemaMarkup($);
+  const schemaTypes = Array.from(new Set([...extractSchemaTypes(jsonLdItems, semanticMarkup), ...extractHydrationSchemaTypes(html)])).sort();
+  const microdataItems = $('[itemscope], [itemtype], [itemprop]').toArray().length;
+  const rdfaItems = $('[typeof], [property], [vocab], [prefix]').toArray().filter((element) => {
+    const value = `${$(element).attr("typeof") ?? ""} ${$(element).attr("property") ?? ""} ${$(element).attr("vocab") ?? ""} ${$(element).attr("prefix") ?? ""}`;
+    return /schema\.org|schema:|^[A-Z][A-Za-z]+$/i.test(value);
+  }).length;
+  const validJsonLdBlocks = jsonLdItems.length;
+  const jsonLdBlocks = countJsonLdBlocks($, html);
+  const normalizedTypes = schemaTypes.map(normalizeSchemaType);
+  const hasType = (type: string) => normalizedTypes.includes(normalizeSchemaType(type));
+  const title = cleanText($("title").first().text());
+  const metaDescription = cleanText($('meta[name="description"]').attr("content") ?? "");
+  const bodyText = cleanText($("body").text());
+
+  if (hasType("FAQPage") && !/"mainEntity"\s*:|itemprop=["']mainEntity/i.test(html)) {
+    incompleteFields.push("FAQPage schema is present but mainEntity questions were not clearly detected.");
+  }
+  if (hasType("Organization") && !/"name"\s*:|itemprop=["']name/i.test(html)) {
+    incompleteFields.push("Organization schema is present but a name field was not clearly detected.");
+  }
+  if (hasType("Product") && !/"name"\s*:|itemprop=["']name/i.test(html)) {
+    incompleteFields.push("Product schema is present but a name field was not clearly detected.");
+  }
+  if ((hasType("Review") || hasType("AggregateRating")) && !/"ratingValue"\s*:|itemprop=["']ratingValue/i.test(html)) {
+    incompleteFields.push("Rating or review schema is present but ratingValue was not clearly detected.");
+  }
+
+  const recommended = recommendSchemaTypes(schemaTypes, `${title} ${metaDescription} ${bodyText}`, pageUrl);
+  const missingRecommendedSchema = recommended.filter((type) => !hasType(type));
+  const recommendations = buildSchemaRecommendations(schemaTypes, missingRecommendedSchema, warnings, incompleteFields);
+
+  debugSchemaLog("Schema detection", {
+    url: pageUrl,
+    jsonLdBlocks,
+    validJsonLdBlocks,
+    microdataItems,
+    rdfaItems,
+    schemaTypes,
+    warnings,
+  });
+
+  return {
+    schemaDetected: schemaTypes.length > 0 || semanticMarkup.length > 0,
+    schemaTypes,
+    schemaCount: schemaTypes.length,
+    faqSchema: hasType("FAQPage"),
+    organizationSchema: hasType("Organization"),
+    productSchema: hasType("Product"),
+    localBusinessSchema: hasType("LocalBusiness"),
+    breadcrumbSchema: hasType("BreadcrumbList"),
+    articleSchema: hasType("Article") || hasType("NewsArticle") || hasType("BlogPosting"),
+    websiteSchema: hasType("WebSite"),
+    serviceSchema: hasType("Service"),
+    personSchema: hasType("Person"),
+    reviewSchema: hasType("Review"),
+    aggregateRatingSchema: hasType("AggregateRating"),
+    jsonLdBlocks,
+    jsonLdValidBlocks: validJsonLdBlocks,
+    jsonLdInvalidBlocks: Math.max(0, jsonLdBlocks - validJsonLdBlocks),
+    microdataItems,
+    rdfaItems,
+    invalidSchemaWarnings: warnings.slice(0, 12),
+    incompleteFields: incompleteFields.slice(0, 12),
+    missingRecommendedSchema,
+    recommendations,
+  };
+}
+
+function schemaDetectionJsonLd($: CheerioRoot, html: string, warnings: string[] = []): unknown[] {
+  const parsed: unknown[] = [];
+  const seen = new Set<string>();
+
+  $("script").each((index, element) => {
+    const raw = $(element).html() ?? "";
+    const type = ($(element).attr("type") ?? "").toLowerCase();
+    const isJsonLd = type.includes("ld+json") || type.includes("json+ld");
+    const isSchemaJson = type === "application/json" && /@context|schema\.org|@type/.test(raw);
+    if (!raw || (!isJsonLd && !isSchemaJson)) {
+      return;
+    }
+    addParsedJsonLd(raw, `script #${index + 1}`, parsed, seen, warnings);
+  });
+
+  for (const match of html.matchAll(/<script\b[^>]*type=["'][^"']*ld\+json[^"']*["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    addParsedJsonLd(match[1] ?? "", "raw script fallback", parsed, seen, warnings);
+  }
+
+  for (const match of html.matchAll(/(?:__NEXT_DATA__|self\.__next_f|helmet|ld\+json)[\s\S]{0,6000}?(?:@context|https?:\\?\/\\?\/schema\.org|@type)[\s\S]{0,6000}/gi)) {
+    const inferredTypes = extractSchemaTypesFromText(match[0]);
+    if (inferredTypes.length > 0) {
+      parsed.push({ "@type": inferredTypes, "@context": "https://schema.org" });
+    }
+  }
+
+  return parsed;
+}
+
+function addParsedJsonLd(raw: string, label: string, parsed: unknown[], seen: Set<string>, warnings: string[]): void {
+  const cleaned = sanitizeJsonLd(raw);
+  if (!cleaned || seen.has(cleaned)) {
+    return;
+  }
+  seen.add(cleaned);
+
+  const value = parseJsonLd(cleaned);
+  if (value !== null) {
+    parsed.push(value);
+    return;
+  }
+
+  const repaired = repairJsonLd(cleaned);
+  const repairedValue = repaired ? parseJsonLd(repaired) : null;
+  if (repairedValue !== null) {
+    parsed.push(repairedValue);
+    warnings.push(`${label}: JSON-LD parsed after sanitization.`);
+    return;
+  }
+
+  const fallbackTypes = extractSchemaTypesFromText(cleaned);
+  if (fallbackTypes.length > 0) {
+    parsed.push({ "@context": "https://schema.org", "@type": fallbackTypes });
+    warnings.push(`${label}: invalid JSON-LD, but schema types were recovered.`);
+    debugSchemaLog("Invalid JSON-LD recovered", { label, fallbackTypes });
+    return;
+  }
+
+  warnings.push(`${label}: invalid JSON-LD could not be parsed.`);
+  debugSchemaLog("Invalid JSON-LD", { label, preview: cleaned.slice(0, 180) });
+}
+
+function extractSemanticSchemaMarkup($: CheerioRoot): string[] {
+  const values = new Set<string>();
+
+  $('[itemscope], [itemtype], [itemprop], [typeof], [property^="schema:"], [vocab*="schema.org"], [prefix*="schema"]').each((_, element) => {
+    const itemType = $(element).attr("itemtype") ?? "";
+    const typeOf = $(element).attr("typeof") ?? "";
+    const property = $(element).attr("property") ?? "";
+    const vocab = $(element).attr("vocab") ?? "";
+    const prefix = $(element).attr("prefix") ?? "";
+    const text = cleanText(`${itemType} ${typeOf} ${property} ${vocab} ${prefix}`);
+    if (text) {
+      values.add(text);
+    }
+  });
+
+  return Array.from(values).slice(0, 80);
+}
+
 function extractSchemaTypes(jsonLd: unknown[], microdata: string[]): string[] {
   const found = new Set<string>();
 
@@ -498,10 +691,7 @@ function extractSchemaTypes(jsonLd: unknown[], microdata: string[]): string[] {
   }
 
   for (const value of microdata) {
-    const match = value.match(/schema\.org\/([A-Za-z]+)/i);
-    if (match?.[1]) {
-      found.add(match[1]);
-    }
+    extractSchemaTypesFromText(value).forEach((type) => found.add(type));
   }
 
   return Array.from(found).slice(0, 30);
@@ -526,6 +716,83 @@ function collectJsonLdTypes(value: unknown, found: Set<string>): void {
   }
 
   Object.values(value).forEach((item) => collectJsonLdTypes(item, found));
+}
+
+function countJsonLdBlocks($: CheerioRoot, html: string): number {
+  const cheerioCount = $("script").toArray().filter((element) => {
+    const type = ($(element).attr("type") ?? "").toLowerCase();
+    return type.includes("ld+json") || type.includes("json+ld");
+  }).length;
+  const rawCount = Array.from(html.matchAll(/<script\b[^>]*type=["'][^"']*ld\+json[^"']*["'][^>]*>/gi)).length;
+  return Math.max(cheerioCount, rawCount);
+}
+
+function extractHydrationSchemaTypes(html: string): string[] {
+  const matches = html.match(/(?:@type|\\u0040type|schema\.org|schema\\u002eorg|FAQPage|LocalBusiness|Product|Article|BreadcrumbList|Organization|WebSite|Service|Person|Review|AggregateRating)[\s\S]{0,280}/gi) ?? [];
+  return Array.from(new Set(matches.flatMap(extractSchemaTypesFromText))).slice(0, 30);
+}
+
+function extractSchemaTypesFromText(value: string): string[] {
+  const decoded = decodeHtmlEntities(value).replace(/\\\//g, "/").replace(/\\u002f/gi, "/").replace(/\\u0040/gi, "@");
+  const found = new Set<string>();
+  const patterns = [
+    /schema\.org\/([A-Za-z][A-Za-z0-9_-]+)/gi,
+    /["']@type["']\s*:\s*["']([^"']+)["']/gi,
+    /\\?"@type\\?"\s*:\s*\\?"([^"\\]+)\\?"/gi,
+    /\b(?:typeof|itemtype)=["'][^"']*?([A-Z][A-Za-z0-9_-]+)["']/gi,
+    /\bschema:([A-Za-z][A-Za-z0-9_-]+)/gi,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of decoded.matchAll(pattern)) {
+      const raw = match[1] ?? "";
+      raw.split(/\s*,\s*|\s+/).map(normalizeSchemaType).filter(Boolean).forEach((type) => found.add(type));
+    }
+  }
+
+  COMMON_SCHEMA_TYPES.forEach((type) => {
+    if (new RegExp(`\\b${escapeRegExp(type)}\\b`, "i").test(decoded)) {
+      found.add(type);
+    }
+  });
+
+  return Array.from(found).filter((type) => /^[A-Z][A-Za-z0-9_-]+$/.test(type)).slice(0, 30);
+}
+
+function recommendSchemaTypes(existingTypes: string[], text: string, pageUrl: string): string[] {
+  const recommended = new Set<string>(["Organization", "WebSite", "BreadcrumbList"]);
+  const source = `${text} ${pageUrl}`.toLowerCase();
+
+  if (/\b(faq|frequently asked|what|how|why|can|does|should)\b/.test(source)) recommended.add("FAQPage");
+  if (/\b(product|sku|price|sale|cart|shop|collection|brand)\b/.test(source)) recommended.add("Product");
+  if (/\b(article|blog|news|guide|published|author|post)\b/.test(source)) recommended.add("Article");
+  if (/\b(local|near me|address|phone|directions|opening hours|service area|restaurant|clinic|florist|store)\b/.test(source)) recommended.add("LocalBusiness");
+  if (/\b(service|services|quote|booking|appointment|consultation|repair|delivery)\b/.test(source)) recommended.add("Service");
+  if (/\b(review|rating|testimonial|stars)\b/.test(source)) {
+    recommended.add("Review");
+    recommended.add("AggregateRating");
+  }
+  if (/\b(author|founder|expert|profile|person)\b/.test(source)) recommended.add("Person");
+
+  const existing = new Set(existingTypes.map(normalizeSchemaType));
+  return Array.from(recommended).filter((type) => !existing.has(normalizeSchemaType(type))).slice(0, 8);
+}
+
+function buildSchemaRecommendations(schemaTypes: string[], missing: string[], warnings: string[], incomplete: string[]): string[] {
+  const recommendations: string[] = [];
+  if (schemaTypes.length === 0) {
+    recommendations.push("Add JSON-LD structured data for Organization, WebSite, BreadcrumbList, and the primary page type.");
+  }
+  if (missing.length > 0) {
+    recommendations.push(`Consider adding ${missing.slice(0, 5).join(", ")} schema where it accurately matches the page content.`);
+  }
+  if (warnings.length > 0) {
+    recommendations.push("Validate malformed JSON-LD in Google's Rich Results Test or Schema Markup Validator.");
+  }
+  if (incomplete.length > 0) {
+    recommendations.push("Complete required and recommended schema fields such as name, url, mainEntity, offers, ratingValue, and author.");
+  }
+  return recommendations.slice(0, 6);
 }
 
 function analyzeAiCrawlerAccess(startUrl: URL, robots: ParsedRobots): AiCrawlerAccess[] {
@@ -629,6 +896,66 @@ function parseJsonLd(raw: string): unknown | null {
     return JSON.parse(raw.trim());
   } catch {
     return null;
+  }
+}
+
+function sanitizeJsonLd(raw: string): string {
+  return decodeHtmlEntities(raw)
+    .replace(/^\uFEFF/, "")
+    .replace(/<!--|-->/g, "")
+    .replace(/<\/script\s*>/gi, "")
+    .trim();
+}
+
+function repairJsonLd(raw: string): string {
+  const trimmed = raw.trim();
+  const firstObject = trimmed.indexOf("{");
+  const firstArray = trimmed.indexOf("[");
+  const startCandidates = [firstObject, firstArray].filter((index) => index >= 0);
+  const start = startCandidates.length ? Math.min(...startCandidates) : -1;
+  const end = Math.max(trimmed.lastIndexOf("}"), trimmed.lastIndexOf("]"));
+
+  if (start < 0 || end <= start) {
+    return "";
+  }
+
+  return trimmed
+    .slice(start, end + 1)
+    .replace(/,\s*([}\]])/g, "$1")
+    .replace(/[\u0000-\u001F]+/g, " ")
+    .trim();
+}
+
+function decodeHtmlEntities(value: string): string {
+  return value
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&#x22;/gi, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#x2F;/gi, "/")
+    .replace(/&#47;/g, "/");
+}
+
+function normalizeSchemaType(type: string): string {
+  return type
+    .replace(/^https?:\/\/schema\.org\//i, "")
+    .replace(/^schema:/i, "")
+    .replace(/[^A-Za-z0-9_-]/g, "")
+    .trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function debugSchemaLog(message: string, details: Record<string, unknown>): void {
+  if (process.env.NODE_ENV === "development") {
+    console.info(`[GEO schema] ${message}`, details);
   }
 }
 

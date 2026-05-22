@@ -204,7 +204,7 @@ function scoreAiFriendliness(page: ExtractedPage): number {
   if (page.lists.length > 0) score += 15;
   if (page.tables.length > 0) score += 10;
   if (page.faqContent.length > 0) score += 20;
-  if (page.jsonLd.length > 0) score += 15;
+  if (page.schemaDetection.schemaDetected) score += 15;
 
   return clamp(score);
 }
@@ -226,10 +226,11 @@ function scoreFaqOptimization(page: ExtractedPage): number {
 
 function scoreSchemaUsage(page: ExtractedPage): number {
   let score = 0;
-  if (page.jsonLd.length > 0) score += 55;
-  if (page.schemaMarkup.length > 0) score += 20;
+  if (page.schemaDetection.jsonLdValidBlocks > 0) score += 50;
+  if (page.schemaDetection.microdataItems > 0 || page.schemaDetection.rdfaItems > 0 || page.schemaMarkup.length > 0) score += 25;
   if (hasFaqSchema(page)) score += 15;
   if (hasOrganizationSchema(page)) score += 10;
+  if (page.schemaDetection.invalidSchemaWarnings.length > 0) score -= 10;
   return clamp(score);
 }
 
@@ -331,7 +332,7 @@ function scorePageReport(page: ExtractedPage): PageGeoReport {
     topicCoverageScore,
     featuredSnippetScore,
     issueCount: countPageIssues(page),
-    schemaCount: page.schemaTypes.length,
+    schemaCount: page.schemaDetection.schemaCount,
     wordCount: page.wordCount,
     headingStructureQuality,
     aiAnswerPreview: generateAiAnswerPreview(page),
@@ -874,15 +875,19 @@ function countPageIssues(page: ExtractedPage): number {
 }
 
 function hasFaqSchema(page: ExtractedPage): boolean {
-  return JSON.stringify(page.jsonLd).toLowerCase().includes("faqpage");
+  return page.schemaDetection.faqSchema || hasSchemaType(page, "FAQPage");
 }
 
 function hasOrganizationSchema(page: ExtractedPage): boolean {
-  return JSON.stringify(page.jsonLd).toLowerCase().includes("organization");
+  return page.schemaDetection.organizationSchema || hasSchemaType(page, "Organization");
 }
 
 function hasPersonSchema(page: ExtractedPage): boolean {
-  return JSON.stringify(page.jsonLd).toLowerCase().includes("person");
+  return page.schemaDetection.personSchema || hasSchemaType(page, "Person");
+}
+
+function hasSchemaType(page: ExtractedPage, type: string): boolean {
+  return page.schemaTypes.some((schemaType) => schemaType.toLowerCase() === type.toLowerCase());
 }
 
 function average(values: number[]): number {

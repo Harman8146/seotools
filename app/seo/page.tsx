@@ -20,7 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useMemo, useState } from "react";
 import { SiteNavbar } from "@/components/site-navbar";
 // import { getUULE, uuleArray, getGL } from "../src/lib/uule";
 import { getUULE, getGL, uuleArray } from "@/src/lib/uule";
@@ -40,12 +40,6 @@ export default function Home() {
     countryCode: string;
     state: string;
   } | null>(null);
-
-  useEffect(() => {
-    document.body.style.background = dark
-      ? "#020617"
-      : "#f8fafc";
-  }, [dark]);
 
   const suggestions = useMemo(() => {
     if (locationSelected || deferredQuery.length < 2) {

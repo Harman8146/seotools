@@ -190,11 +190,11 @@ export default function Home() {
 
         <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-[1.04fr_0.96fr]">
           <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55 }}>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/80 px-4 py-2 text-sm font-bold text-blue-700 shadow-sm backdrop-blur dark:border-sky-400/20 dark:bg-slate-900/70 dark:text-sky-300">
+            <div className="home-glass-panel mb-6 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-bold text-blue-700 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-sky-300">
               <Sparkles size={16} aria-hidden="true" />
               AI search visibility meets technical SEO
             </div>
-              <h1 className="max-w-4xl text-5xl font-black leading-[1.02] tracking-tight md:text-7xl">
+              <h1 className="max-w-4xl text-[clamp(2.5rem,10vw,4.75rem)] font-black leading-[1.04] tracking-tight">
                 AI-Powered SEO & GEO Optimization Platform
               </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600 md:text-xl dark:text-slate-300">
@@ -209,7 +209,7 @@ export default function Home() {
               {["100k+ locations", "Rule-based AI audit", "No login required"].map((item, index) => (
                 <motion.div
                   key={item}
-                  className="rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm font-black text-slate-700 shadow-lg backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-200"
+                  className="home-glass-card rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                   animate={{ y: [0, -4, 0] }}
                   transition={{ duration: 4 + index, repeat: Infinity, ease: "easeInOut" }}
                 >
@@ -235,7 +235,7 @@ export default function Home() {
             return (
               <motion.article
                 key={feature.title}
-                className="group rounded-2xl border border-white/70 bg-white/75 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_22px_70px_rgba(37,99,235,0.16)] dark:border-slate-700/70 dark:bg-slate-900/68"
+                className="home-glass-card group rounded-2xl border border-slate-300 bg-white p-6 shadow-[0_18px_55px_rgba(15,23,42,0.08)] transition hover:-translate-y-1 hover:shadow-[0_22px_70px_rgba(37,99,235,0.16)] dark:border-slate-700 dark:bg-slate-900"
                 initial={{ opacity: 0, y: 18 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-80px" }}
@@ -258,7 +258,7 @@ export default function Home() {
           {steps.map((step, index) => (
             <motion.div
               key={step}
-              className="relative rounded-2xl border border-white/70 bg-white/80 p-6 text-center shadow-lg backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/72"
+              className="home-glass-card relative rounded-2xl border border-slate-300 bg-white p-6 text-center shadow-lg dark:border-slate-700 dark:bg-slate-900"
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -389,7 +389,7 @@ function CtaButton({
 function DashboardPreview() {
   return (
     <motion.div
-      className="rounded-3xl border border-white/70 bg-white/78 p-4 shadow-[0_30px_90px_rgba(15,23,42,0.18)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-900/72"
+      className="home-glass-panel rounded-3xl border border-slate-300 bg-white p-4 shadow-[0_30px_90px_rgba(15,23,42,0.18)] dark:border-slate-700 dark:bg-slate-900"
       initial={{ opacity: 0, y: 30, rotateX: 8 }}
       animate={{ opacity: 1, y: 0, rotateX: 0 }}
       transition={{ duration: 0.65, delay: 0.12 }}
@@ -404,10 +404,10 @@ function DashboardPreview() {
           <span className="rounded-full bg-sky-400/10 px-3 py-1 text-xs font-bold text-sky-300">Live Audit</span>
         </div>
         <div className="grid gap-4 md:grid-cols-[0.72fr_1fr]">
-          <div className="rounded-2xl bg-white/8 p-4">
+          <div className="rounded-2xl bg-slate-800 p-4">
             <div className="text-sm text-slate-400">GEO Score</div>
             <div className="mt-2 text-5xl font-black">87</div>
-            <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
+            <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-700">
               <motion.div
                 className="h-full rounded-full bg-gradient-to-r from-blue-500 to-sky-300"
                 initial={{ width: "18%" }}
@@ -422,7 +422,7 @@ function DashboardPreview() {
               ["Internal links", "Scanned", Network],
               ["AI readability", "Strong", Activity],
             ].map(([label, value, Icon]) => (
-              <div key={label as string} className="flex items-center justify-between rounded-2xl bg-white/8 p-4">
+              <div key={label as string} className="flex items-center justify-between rounded-2xl bg-slate-800 p-4">
                 <div className="flex items-center gap-3">
                   <span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-400/10 text-sky-300">
                     <Icon size={18} aria-hidden="true" />
@@ -456,10 +456,10 @@ function ToolCard({
 }) {
   return (
     <motion.article
-      className={`rounded-3xl border p-7 shadow-[0_24px_70px_rgba(15,23,42,0.10)] backdrop-blur ${
+      className={`home-glass-card rounded-3xl border p-7 shadow-[0_24px_70px_rgba(15,23,42,0.10)] ${
         featured
-          ? "border-blue-200 bg-gradient-to-br from-white via-blue-50 to-sky-50 dark:border-sky-400/20 dark:from-slate-900 dark:via-slate-900 dark:to-sky-950/40"
-          : "border-white/70 bg-white/78 dark:border-slate-700/70 dark:bg-slate-900/72"
+          ? "border-blue-200 bg-white dark:border-slate-700 dark:bg-slate-900"
+          : "border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900"
       }`}
       whileHover={{ y: -6 }}
       transition={{ type: "spring", stiffness: 280, damping: 22 }}
@@ -510,7 +510,7 @@ function IndustryUpdatesSection({
           transition={{ duration: 0.35 }}
         >
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white/75 px-4 py-2 text-sm font-black text-blue-700 shadow-sm backdrop-blur dark:border-sky-400/20 dark:bg-slate-900/70 dark:text-sky-300">
+            <div className="home-glass-panel mb-3 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-4 py-2 text-sm font-black text-blue-700 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-sky-300">
               <Radio size={16} aria-hidden="true" />
               Live industry radar
             </div>
@@ -520,7 +520,7 @@ function IndustryUpdatesSection({
               and crawler changes. Cached in the browser for speed.
             </p>
           </div>
-          <div className="flex items-center gap-2 rounded-2xl border border-white/70 bg-white/70 px-4 py-3 text-sm font-bold text-slate-600 shadow-lg backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/70 dark:text-slate-300">
+          <div className="home-glass-panel flex items-center gap-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-600 shadow-lg dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
             <RefreshCw size={16} className={loading ? "animate-spin" : ""} aria-hidden="true" />
             {loading ? "Refreshing feeds" : "Cached live feeds"}
           </div>
@@ -535,7 +535,7 @@ function IndustryUpdatesSection({
               className={`shrink-0 rounded-full border px-4 py-2 text-sm font-black transition ${
                 activeCategory === category
                   ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-500/20"
-                  : "border-white/70 bg-white/70 text-slate-600 hover:border-blue-300 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300"
+                  : "border-slate-300 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
               }`}
             >
               {category}
@@ -580,7 +580,7 @@ function IndustryUpdatesSection({
                       href={item.url}
                       target={item.url.startsWith("http") ? "_blank" : undefined}
                       rel={item.url.startsWith("http") ? "noopener noreferrer" : undefined}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-black text-black text-decoration-none shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-blue-700 dark:bg-white dark:text-slate-950"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-slate-950 px-4 py-2 text-sm font-black text-white text-decoration-none shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-blue-700 dark:bg-white dark:text-slate-950"
                     >
                       Read more
                       <ArrowRight size={16} aria-hidden="true" />

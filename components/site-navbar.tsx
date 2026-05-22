@@ -19,7 +19,7 @@ export function SiteNavbar() {
   return (
     <header className="sticky top-0 z-50 px-3 pt-3">
       <nav
-        className="mx-auto flex max-w-6xl items-center justify-between rounded-2xl border border-white/50 bg-white/80 px-4 py-3 shadow-[0_18px_60px_rgba(15,23,42,0.10)] backdrop-blur-xl dark:border-slate-700/70 dark:bg-slate-950/75"
+        className="site-navbar-shell mx-auto flex max-w-6xl items-center justify-between rounded-2xl border border-slate-300 bg-white px-4 py-3 shadow-[0_18px_60px_rgba(15,23,42,0.10)] dark:border-slate-700 dark:bg-slate-950"
         aria-label="Primary navigation"
       >
         <Link href="/" className="group flex items-center gap-3 text-decoration-none" aria-label="SEO GEO Platform home">
@@ -53,7 +53,7 @@ export function SiteNavbar() {
                 {active && (
                   <motion.span
                     layoutId="nav-active-pill"
-                    className="absolute inset-0 rounded-xl bg-blue-50 shadow-sm dark:bg-sky-400/10"
+                    className="absolute inset-0 rounded-xl bg-blue-50 shadow-sm dark:bg-slate-800"
                     transition={{ type: "spring", stiffness: 380, damping: 32 }}
                   />
                 )}
@@ -69,7 +69,7 @@ export function SiteNavbar() {
         <div className="hidden items-center gap-2 md:flex">
           <Link
             href="/ai-visibility-checker"
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-black text-decoration-none shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-blue-700 dark:bg-white dark:text-slate-950"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2 text-sm font-bold text-white text-decoration-none shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-blue-700 dark:bg-white dark:text-slate-950"
           >
             <Sparkles size={16} aria-hidden="true" />
             Run GEO Audit
@@ -96,7 +96,7 @@ export function SiteNavbar() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18 }}
-            className="mx-auto mt-2 max-w-6xl rounded-2xl border border-white/50 bg-white/95 p-2 shadow-2xl backdrop-blur-xl md:hidden dark:border-slate-700 dark:bg-slate-950/95"
+            className="site-navbar-menu mx-auto mt-2 max-w-6xl rounded-2xl border border-slate-300 bg-white p-2 shadow-2xl md:hidden dark:border-slate-700 dark:bg-slate-950"
           >
             {navItems.map((item) => {
               const active = pathname === item.href;
@@ -109,7 +109,7 @@ export function SiteNavbar() {
                   onClick={() => setOpen(false)}
                   className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-bold text-decoration-none ${
                     active
-                      ? "bg-blue-50 text-blue-700 dark:bg-sky-400/10 dark:text-sky-300"
+                      ? "bg-blue-50 text-blue-700 dark:bg-slate-800 dark:text-sky-300"
                       : "text-slate-700 dark:text-slate-200"
                   }`}
                   aria-current={active ? "page" : undefined}

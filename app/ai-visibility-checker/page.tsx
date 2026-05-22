@@ -171,6 +171,31 @@ type GeoResult = {
     duplicateTitles?: string[];
     duplicateDescriptions?: string[];
     analyzedUrls: string[];
+    schemaDetection?: {
+      schemaDetected: boolean;
+      schemaTypes: string[];
+      schemaCount: number;
+      faqSchema: boolean;
+      organizationSchema: boolean;
+      productSchema: boolean;
+      localBusinessSchema: boolean;
+      breadcrumbSchema: boolean;
+      articleSchema: boolean;
+      websiteSchema: boolean;
+      serviceSchema: boolean;
+      personSchema: boolean;
+      reviewSchema: boolean;
+      aggregateRatingSchema: boolean;
+      jsonLdBlocks: number;
+      jsonLdValidBlocks: number;
+      jsonLdInvalidBlocks: number;
+      microdataItems: number;
+      rdfaItems: number;
+      invalidSchemaWarnings: string[];
+      incompleteFields: string[];
+      missingRecommendedSchema: string[];
+      recommendations: string[];
+    };
   };
 };
 
@@ -197,8 +222,6 @@ export default function GeoPage() {
   const [error, setError] = useState("");
   const [result, setResult] = useState<GeoResult | null>(null);
   const [expandedPage, setExpandedPage] = useState<string | null>(null);
-  const [activeScorePanel, setActiveScorePanel] = useState<string>("AI Visibility Score");
-  const [expandedSuggestion, setExpandedSuggestion] = useState<string | null>(null);
   const resultsRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -304,14 +327,10 @@ export default function GeoPage() {
     window.print();
   }, []);
 
-  const copyText = useCallback(async (text: string) => {
-    await navigator.clipboard.writeText(text);
-  }, []);
-
   return (
     <>
     <SiteNavbar />
-    <main className="geo-premium-page container-fluid py-5 text-dark dark:text-light">
+    <main className="geo-premium-page container-fluid px-3 px-sm-4 py-4 py-md-5 text-dark dark:text-light">
       <div className="premium-aurora" aria-hidden="true" />
       <div className="container" style={{ maxWidth: "980px" }}>
         <header className="geo-hero-shell mb-5">
@@ -417,26 +436,14 @@ export default function GeoPage() {
             {result.scores && (
               <div className="row g-4 mb-4">
                 {Object.entries(result.scores).map(([label, value]) => (
-                  <ScoreCard
-                    key={label}
-                    label={formatMetric(label)}
-                    value={value}
-                    active={activeScorePanel === formatMetric(label)}
-                    onClick={() => setActiveScorePanel(formatMetric(label))}
-                  />
+                  <ScoreCard key={label} label={formatMetric(label)} value={value} />
                 ))}
               </div>
             )}
 
-            {result.pageAnalysis && (
-              <ScoreDrilldownPanel active={activeScorePanel} result={result} />
-            )}
-
             {result.advancedAnalytics && (
-              <AdvancedAnalyticsPanel analytics={result.advancedAnalytics} onCopy={copyText} />
+              <AdvancedAnalyticsPanel analytics={result.advancedAnalytics} />
             )}
-
-            <QuickWinsPanel result={result} onCopy={copyText} />
 
             <div className="card border-0 shadow-sm mb-4">
               <div className="card-body p-4">
@@ -478,6 +485,10 @@ export default function GeoPage() {
               </div>
             )}
 
+            {result.technicalFindings.schemaDetection && (
+              <SchemaInsightsPanel schema={result.technicalFindings.schemaDetection} />
+            )}
+
             <div className="row g-4">
               <ResultList title="Strengths" items={result.strengths} tone="success" />
               <ResultList title="Weaknesses" items={result.weaknesses} tone="warning" />
@@ -503,11 +514,8 @@ export default function GeoPage() {
               <div className="card-body p-4">
                 <h2 className="h5 fw-bold mb-3">Smart Rule-Based Audit Issues</h2>
                 <div className="d-grid gap-3">
-                  {result.suggestions.map((suggestion) => {
-                    const key = `${suggestion.category}-${suggestion.title}`;
-                    const expanded = expandedSuggestion === key;
-                    return (
-                    <article key={key} className="border rounded-3 p-3 geo-action-card">
+                  {result.suggestions.map((suggestion) => (
+                    <article key={`${suggestion.category}-${suggestion.title}`} className="border rounded-3 p-3">
                       <div className="d-flex align-items-center gap-2 mb-2">
                         <span className={`badge rounded-pill ${badgeClass(suggestion.priority)}`}>
                           {suggestion.priority}
@@ -525,32 +533,8 @@ export default function GeoPage() {
                         </div>
                       )}
                       <p className="mb-0 small opacity-75">{suggestion.recommendation}</p>
-                      <div className="d-flex flex-wrap gap-2 mt-3">
-                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => copyText(suggestion.recommendation)}>
-                          Copy Suggestion
-                        </button>
-                        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setExpandedSuggestion(expanded ? null : key)}>
-                          {expanded ? "Hide Details" : "Why This Matters"}
-                        </button>
-                      </div>
-                      <AnimatePresence initial={false}>
-                        {expanded && (
-                          <motion.div
-                            className="geo-recommendation-detail mt-3"
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -6 }}
-                            transition={{ duration: 0.18 }}
-                          >
-                            <strong>AI impact:</strong> Clearer structure improves answer extraction, citation confidence, and user engagement.
-                            <br />
-                            <strong>Implementation:</strong> Apply this fix on the affected page, then rerun the audit to track progress.
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
                     </article>
-                    );
-                  })}
+                  ))}
                 </div>
               </div>
             </div>
@@ -569,7 +553,6 @@ export default function GeoPage() {
                         page={page}
                         expanded={expandedPage === page.url}
                         onToggle={() => setExpandedPage((current) => (current === page.url ? null : page.url))}
-                        onCopy={copyText}
                       />
                     ))}
                   </div>
@@ -702,7 +685,7 @@ function GeoLoadingModal({ progress, status, success }: { progress: number; stat
   );
 }
 
-const AdvancedAnalyticsPanel = memo(function AdvancedAnalyticsPanel({ analytics, onCopy }: { analytics: NonNullable<GeoResult["advancedAnalytics"]>; onCopy: (text: string) => void }) {
+const AdvancedAnalyticsPanel = memo(function AdvancedAnalyticsPanel({ analytics }: { analytics: NonNullable<GeoResult["advancedAnalytics"]> }) {
   return (
     <div className="d-grid gap-4 mb-4">
       <div className="card border-0 shadow-sm">
@@ -779,12 +762,7 @@ const AdvancedAnalyticsPanel = memo(function AdvancedAnalyticsPanel({ analytics,
               <InsightBox title="FAQ Opportunity Generator" icon={<Clipboard size={18} />}>
                 <ol className="small mb-0 d-grid gap-2">
                   {analytics.faqOpportunities.slice(0, 8).map((question) => (
-                    <li key={question} className="geo-faq-opportunity">
-                      <span>{question}</span>
-                      <button type="button" className="btn btn-sm btn-light border" onClick={() => onCopy(question)}>
-                        Copy
-                      </button>
-                    </li>
+                    <li key={question}>{question}</li>
                   ))}
                 </ol>
               </InsightBox>
@@ -839,13 +817,102 @@ function TagList({ items, empty, tone }: { items: string[]; empty: string; tone:
 
 function AuditMiniCard({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
   return (
-    <div className="col-md-4">
+    <div className="col-sm-6 col-lg-4">
       <div className="geo-audit-mini-card">
         <div className="d-flex align-items-center gap-2 fw-bold small mb-1">
           {icon}
           {title}
         </div>
         <div className="small opacity-75">{text}</div>
+      </div>
+    </div>
+  );
+}
+
+function SchemaInsightsPanel({ schema }: { schema: NonNullable<GeoResult["technicalFindings"]["schemaDetection"]> }) {
+  const readiness = schema.schemaDetected && schema.jsonLdInvalidBlocks === 0 && schema.incompleteFields.length === 0;
+  const richResultItems = [
+    ["FAQ schema", schema.faqSchema],
+    ["Organization", schema.organizationSchema],
+    ["LocalBusiness", schema.localBusinessSchema],
+    ["Product", schema.productSchema],
+    ["Breadcrumbs", schema.breadcrumbSchema],
+    ["Article", schema.articleSchema],
+  ] as const;
+
+  return (
+    <div className="card border-0 shadow-sm mb-4">
+      <div className="card-body p-4">
+        <div className="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+          <div>
+            <div className="small fw-bold text-primary mb-1">Structured Data</div>
+            <h2 className="h5 fw-bold mb-1">Schema Markup Insights</h2>
+            <p className="small opacity-75 mb-0">
+              {schema.schemaDetected
+                ? `${schema.schemaCount} schema type${schema.schemaCount === 1 ? "" : "s"} detected across JSON-LD, Microdata, RDFa, and hydration scripts.`
+                : "No supported schema markup was detected in the crawled HTML."}
+            </p>
+          </div>
+          <span className={`badge rounded-pill align-self-start px-3 py-2 ${readiness ? "text-bg-success" : schema.schemaDetected ? "text-bg-warning" : "text-bg-danger"}`}>
+            {readiness ? "Rich result ready" : schema.schemaDetected ? "Review schema" : "Schema missing"}
+          </span>
+        </div>
+
+        <div className="row g-3 mb-3">
+          <Finding label="Schema types" value={String(schema.schemaCount)} />
+          <Finding label="JSON-LD blocks" value={`${schema.jsonLdValidBlocks}/${schema.jsonLdBlocks || schema.jsonLdValidBlocks} valid`} />
+          <Finding label="Microdata items" value={String(schema.microdataItems)} />
+          <Finding label="RDFa items" value={String(schema.rdfaItems)} />
+        </div>
+
+        {schema.schemaTypes.length > 0 && (
+          <div className="d-flex flex-wrap gap-2 mb-3">
+            {schema.schemaTypes.map((type) => (
+              <span className="badge rounded-pill text-bg-primary px-3 py-2" key={type}>
+                {type}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div className="row g-3">
+          {richResultItems.map(([label, present]) => (
+            <div className="col-sm-6 col-lg-4" key={label}>
+              <div className="border rounded-3 p-3 h-100 d-flex align-items-center gap-2">
+                {present ? <CheckCircle2 className="text-success" size={18} /> : <AlertCircle className="text-warning" size={18} />}
+                <span className="small fw-bold">{label}: {present ? "Detected" : "Not detected"}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <details className="geo-llms-box mt-3">
+          <summary className="fw-bold">Schema opportunities and warnings</summary>
+          <div className="row g-3 mt-2">
+            <SchemaMiniList title="Missing opportunities" items={schema.missingRecommendedSchema} empty="No major schema opportunities detected." />
+            <SchemaMiniList title="Validation warnings" items={[...schema.invalidSchemaWarnings, ...schema.incompleteFields]} empty="No schema validation warnings detected." />
+            <SchemaMiniList title="Recommendations" items={schema.recommendations} empty="Schema coverage looks solid." />
+          </div>
+        </details>
+      </div>
+    </div>
+  );
+}
+
+function SchemaMiniList({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+  return (
+    <div className="col-lg-4">
+      <div className="border rounded-3 p-3 h-100">
+        <div className="fw-bold small mb-2">{title}</div>
+        {items.length > 0 ? (
+          <ul className="small mb-0 ps-3">
+            {items.slice(0, 6).map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="small opacity-75 mb-0">{empty}</p>
+        )}
       </div>
     </div>
   );
@@ -862,7 +929,7 @@ function LoadingSkeletons() {
       aria-hidden="true"
     >
       {[0, 1, 2].map((item) => (
-        <div className="col-md-4" key={item}>
+        <div className="col-sm-6 col-lg-4" key={item}>
           <div className="geo-skeleton-card">
             <div className="geo-skeleton-line geo-skeleton-short" />
             <div className="geo-skeleton-line geo-skeleton-tall" />
@@ -877,7 +944,7 @@ function LoadingSkeletons() {
 
 function Finding({ label, value }: { label: string; value: string }) {
   return (
-    <div className="col-6">
+    <div className="col-12 col-sm-6">
       <div className="border rounded-3 p-3 h-100">
         <div className="opacity-75">{label}</div>
         <strong>{value}</strong>
@@ -886,87 +953,10 @@ function Finding({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ScoreDrilldownPanel({ active, result }: { active: string; result: GeoResult }) {
-  const pages = result.pageAnalysis ?? [];
-  const issues = pages.flatMap((page) => page.contentIssues ?? []);
-  const details = getScoreDrilldown(active, result, pages, issues);
-
+const ScoreCard = memo(function ScoreCard({ label, value }: { label: string; value: number }) {
   return (
-    <motion.div className="card border-0 shadow-sm mb-4 geo-drilldown-panel" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="card-body p-4">
-        <div className="d-flex flex-column flex-lg-row justify-content-between gap-3">
-          <div>
-            <div className="small fw-bold text-primary mb-1">Interactive Score Drilldown</div>
-            <h2 className="h5 fw-bold mb-2">{active}</h2>
-            <p className="small opacity-75 mb-0">{details.summary}</p>
-          </div>
-          <div className="geo-completion-meter">
-            <strong>{details.score}%</strong>
-            <span>optimization complete</span>
-          </div>
-        </div>
-        <div className="row g-3 mt-3">
-          {details.items.map((item) => (
-            <div className="col-md-4" key={item.title}>
-              <div className="geo-mini-action h-100">
-                <div className="fw-bold mb-2">{item.title}</div>
-                <p className="small mb-0">{item.text}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-function QuickWinsPanel({ result, onCopy }: { result: GeoResult; onCopy: (text: string) => void }) {
-  const wins = buildQuickWins(result);
-
-  return (
-    <div className="card border-0 shadow-sm mb-4 geo-quickwins-panel">
-      <div className="card-body p-4">
-        <div className="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
-          <div>
-            <div className="small fw-bold text-primary mb-1">Action Plan</div>
-            <h2 className="h5 fw-bold mb-1">Top AI Visibility Quick Wins</h2>
-            <p className="small opacity-75 mb-0">Short, high-impact fixes designed to improve answer extraction, trust, and GEO readiness.</p>
-          </div>
-          <span className="badge rounded-pill text-bg-primary align-self-start px-3 py-2">{wins.length} quick wins</span>
-        </div>
-        <div className="row g-3">
-          {wins.map((win, index) => (
-            <div className="col-md-6" key={win.title}>
-              <details className="geo-quickwin-card">
-                <summary>
-                  <span className="geo-step-number">{index + 1}</span>
-                  <strong>{win.title}</strong>
-                </summary>
-                <p>{win.detail}</p>
-                <div className="geo-example-box">
-                  <strong>Example:</strong> {win.example}
-                </div>
-                <button type="button" className="btn btn-sm btn-outline-primary mt-3" onClick={() => onCopy(`${win.title}: ${win.detail}`)}>
-                  Copy Quick Fix
-                </button>
-              </details>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const ScoreCard = memo(function ScoreCard({ label, value, active, onClick }: { label: string; value: number; active: boolean; onClick: () => void }) {
-  return (
-    <div className="col-md-4">
-      <motion.button
-        type="button"
-        className={`card h-100 w-100 border-0 shadow-sm geo-dashboard-card premium-gradient-border text-start ${active ? "geo-score-card-active" : ""}`}
-        whileHover={{ y: -5 }}
-        onClick={onClick}
-      >
+    <div className="col-sm-6 col-xl-4">
+      <motion.div className="card h-100 border-0 shadow-sm geo-dashboard-card premium-gradient-border" whileHover={{ y: -5 }}>
         <div className="card-body p-4 position-relative">
           <div className="d-flex align-items-center justify-content-between gap-3 mb-3">
             <div>
@@ -987,14 +977,13 @@ const ScoreCard = memo(function ScoreCard({ label, value, active, onClick }: { l
           <div className="geo-progress-track">
             <div className="geo-progress-fill" style={{ width: `${value}%` }} />
           </div>
-          <div className="small fw-bold text-primary mt-3">Click to explore issues</div>
         </div>
-      </motion.button>
+      </motion.div>
     </div>
   );
 });
 
-const PageAuditCard = memo(function PageAuditCard({ page, expanded, onToggle, onCopy }: { page: PageAnalysis; expanded: boolean; onToggle: () => void; onCopy: (text: string) => void }) {
+const PageAuditCard = memo(function PageAuditCard({ page, expanded, onToggle }: { page: PageAnalysis; expanded: boolean; onToggle: () => void }) {
   const scores = page.contentQualityScores;
   const issues = page.contentIssues ?? [];
 
@@ -1051,7 +1040,7 @@ const PageAuditCard = memo(function PageAuditCard({ page, expanded, onToggle, on
               {scores && (
                 <div className="row g-3 mb-4">
                   {Object.entries(scores).map(([label, value]) => (
-                    <div className="col-md-4" key={label}>
+                    <div className="col-sm-6 col-lg-4" key={label}>
                       <div className="border rounded-3 p-3 h-100">
                         <div className="small fw-bold mb-2">{formatMetric(label)}</div>
                         <div className="d-flex align-items-center gap-2">
@@ -1075,7 +1064,7 @@ const PageAuditCard = memo(function PageAuditCard({ page, expanded, onToggle, on
                   ["Topic Coverage", page.topicCoverageScore],
                   ["Featured Snippet", page.featuredSnippetScore],
                 ].filter(([, value]) => typeof value === "number").map(([label, value]) => (
-                  <div className="col-md-4" key={String(label)}>
+                  <div className="col-sm-6 col-lg-4" key={String(label)}>
                     <div className="border rounded-3 p-3 h-100">
                       <div className="small fw-bold mb-2">{label}</div>
                       <ScorePill value={Number(value)} />
@@ -1152,10 +1141,6 @@ const PageAuditCard = memo(function PageAuditCard({ page, expanded, onToggle, on
                         </div>
                         <p className="small mb-2">{item.text}</p>
                         <div className="small opacity-75">{item.reason}</div>
-                        <details className="mt-2">
-                          <summary className="small fw-bold">Show quick fix</summary>
-                          <p className="small mb-0 mt-2">{buildHeatmapFix(item.type, item.tone)}</p>
-                        </details>
                       </div>
                     ))}
                   </div>
@@ -1186,17 +1171,6 @@ const PageAuditCard = memo(function PageAuditCard({ page, expanded, onToggle, on
                       <p className="small mb-2"><strong>Issue:</strong> {issue.issue}</p>
                       <p className="small mb-2"><strong>Why it is weak:</strong> {issue.explanation}</p>
                       <p className="small mb-0"><strong>How to improve:</strong> {issue.recommendation}</p>
-                      <div className="geo-example-box mt-3">
-                        <strong>Improved example:</strong> {buildIssueExample(issue)}
-                      </div>
-                      <div className="d-flex flex-wrap gap-2 mt-3">
-                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => onCopy(buildIssueExample(issue))}>
-                          Copy Example
-                        </button>
-                        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onCopy(issue.recommendation)}>
-                          Copy Recommendation
-                        </button>
-                      </div>
                     </div>
                   ))
                 ) : (
@@ -1275,123 +1249,6 @@ const ResultList = memo(function ResultList({ title, items, tone }: { title: str
 
   
 });
-
-function getScoreDrilldown(active: string, result: GeoResult, pages: PageAnalysis[], issues: NonNullable<PageAnalysis["contentIssues"]>) {
-  const score = Math.round(result.scores?.[metricKey(active) as keyof NonNullable<GeoResult["scores"]>] ?? result.geoScore);
-  const weakPages = pages.filter((page) => page.geoScore < 75).slice(0, 3);
-  const semanticIssues = issues.filter((issue) => /heading|semantic|paragraph|format|faq/i.test(`${issue.type} ${issue.issue}`)).slice(0, 3);
-
-  if (/AI Visibility/i.test(active)) {
-    return {
-      score,
-      summary: "Focus on semantic clarity, answer extraction, FAQ quality, content chunking, and entity coverage.",
-      items: [
-        { title: "Answer Extraction", text: `${semanticIssues.length || 0} content blocks can be rewritten as clearer answer-ready sections.` },
-        { title: "Chunking", text: "Use short sections, lists, FAQs, and tables so AI systems can retrieve precise passages." },
-        { title: "Entity Clarity", text: "Make brand, service, product, and location entities explicit in headings and body copy." },
-      ],
-    };
-  }
-  if (/Technical SEO/i.test(active)) {
-    return {
-      score,
-      summary: "Technical signals help crawlers access, interpret, and consolidate your best pages.",
-      items: [
-        { title: "Crawl Health", text: `${result.technicalFindings.failedPages.length} failed page(s) and ${result.technicalFindings.skippedByRobots.length} robots-blocked URL(s) found.` },
-        { title: "Metadata", text: "Review canonical, meta descriptions, Open Graph, and image alt text on weak pages." },
-        { title: "AI Access", text: "Check robots.txt and llms.txt so AI crawlers can identify your useful public content." },
-      ],
-    };
-  }
-  if (/Content Quality|Citation/i.test(active)) {
-    return {
-      score,
-      summary: "Citation probability improves when content is complete, specific, transparent, and easy to quote.",
-      items: [
-        { title: "Completeness", text: "Add pricing, comparisons, examples, local context, and proof where missing." },
-        { title: "Trust", text: "Show contact details, policies, reviews, authorship, or organization schema." },
-        { title: "Weak Pages", text: weakPages.length ? weakPages.map((page) => page.url).join(", ") : "No major weak pages detected." },
-      ],
-    };
-  }
-  return {
-    score,
-    summary: "Use this panel as a guided checklist for the clicked score area.",
-    items: [
-      { title: "Quick Review", text: "Open page-level analysis to inspect weak headings, thin paragraphs, and semantic gaps." },
-      { title: "Prioritize", text: "Start with high-impact issues that affect crawlability, answer extraction, and trust." },
-      { title: "Track Progress", text: "Apply fixes and rerun the audit to measure score movement." },
-    ],
-  };
-}
-
-function buildQuickWins(result: GeoResult): Array<{ title: string; detail: string; example: string }> {
-  const suggestions = result.suggestions ?? [];
-  const hasFaq = suggestions.some((item) => /faq/i.test(item.title));
-  const hasSchema = suggestions.some((item) => /schema|structured/i.test(item.title));
-  const hasHeading = suggestions.some((item) => /heading|structure/i.test(item.title));
-  const wins = [
-    hasFaq && {
-      title: "Add buyer-intent FAQ sections",
-      detail: "Add 4-6 realistic customer questions around delivery, pricing, timing, comparisons, trust, and local availability.",
-      example: "Do you offer same-day delivery in this city?",
-    },
-    hasSchema && {
-      title: "Add or improve FAQ and organization schema",
-      detail: "Expose page meaning with valid JSON-LD so search and AI systems can classify your content more confidently.",
-      example: "Add FAQPage, Organization, LocalBusiness, BreadcrumbList, or Product schema where relevant.",
-    },
-    hasHeading && {
-      title: "Rewrite generic headings",
-      detail: "Replace vague headings with descriptive headings that include the service, product, location, or user intent.",
-      example: "Change 'Our Services' to 'Same-Day Flower Delivery Services in Milton'.",
-    },
-    {
-      title: "Add comparison or pricing context",
-      detail: "AI answer engines prefer content that helps users make decisions quickly without guessing.",
-      example: "Add a simple table comparing delivery options, timelines, fees, or product categories.",
-    },
-    {
-      title: "Strengthen internal links",
-      detail: "Link high-value service, FAQ, contact, collection, and location pages together to improve topical authority.",
-      example: "Link from product/category pages to delivery policy, FAQs, and local service pages.",
-    },
-    {
-      title: "Add trust and E-E-A-T signals",
-      detail: "Show contact details, reviews, business policies, authorship, experience, and transparent service information.",
-      example: "Add a short trust block: delivery area, support hours, returns policy, and verified reviews.",
-    },
-  ].filter(Boolean) as Array<{ title: string; detail: string; example: string }>;
-
-  return wins.slice(0, 6);
-}
-
-function metricKey(label: string): string {
-  return label.charAt(0).toLowerCase() + label.slice(1).replace(/\s+(.)/g, (_, letter: string) => letter.toUpperCase());
-}
-
-function buildIssueExample(issue: NonNullable<PageAnalysis["contentIssues"]>[number]): string {
-  if (/heading/i.test(issue.type)) {
-    return "Use a specific heading that names the service, product, location, or customer intent, such as 'Same-Day Flower Delivery in Milton' instead of a generic label.";
-  }
-  if (/paragraph/i.test(issue.type)) {
-    return "Rewrite as a 45-80 word answer block that states the main topic, who it helps, the key detail, and the next step for the reader.";
-  }
-  if (/faq/i.test(issue.type)) {
-    return "Add realistic questions customers ask before buying, booking, comparing, scheduling, or trusting the business.";
-  }
-  if (/table|missing/i.test(issue.type)) {
-    return "Add a compact table comparing options, timing, pricing signals, service areas, or product categories.";
-  }
-  return "Create a concise, specific content block with one clear answer, supporting details, and an action-oriented next step.";
-}
-
-function buildHeatmapFix(type: string, tone: string): string {
-  if (tone === "strong") return "This block is already AI-friendly. Keep it concise, specific, and close to the related heading.";
-  if (/heading/i.test(type)) return "Rewrite the heading so it clearly names the topic, service, product, location, or question being answered.";
-  if (/paragraph/i.test(type)) return "Split or expand this into a self-contained answer paragraph with concrete details and one clear takeaway.";
-  return "Improve scanability with a concise heading, bullet list, table, or direct answer format.";
-}
 
 
 

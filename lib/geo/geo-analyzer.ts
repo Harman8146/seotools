@@ -1,4 +1,4 @@
-import type { GeoCrawlResult } from "./crawler";
+import type { GeoCrawlResult, SchemaDetectionResult } from "./crawler";
 import { calculateGeoScore, type GeoCategoryScores, type GeoScoreBreakdown, type PageGeoReport } from "./score-engine";
 import { buildAuditIssues, generateRuleBasedSuggestions, type AuditIssue, type Suggestion } from "./suggestions";
 
@@ -34,6 +34,7 @@ export type GeoAnalysisResult = {
     duplicateTitles: string[];
     duplicateDescriptions: string[];
     schemaTypesDetected: string[];
+    schemaDetection: SchemaDetectionResult;
     aiCrawlerAccess: GeoCrawlResult["technicalFindings"]["robotsTxt"]["aiCrawlerAccess"];
   };
 };
@@ -111,8 +112,50 @@ export function analyzeGeo(crawl: GeoCrawlResult): GeoAnalysisResult {
       duplicateTitles: findDuplicates(crawl.pages.map((page) => page.title).filter(Boolean)),
       duplicateDescriptions: findDuplicates(crawl.pages.map((page) => page.metaDescription).filter(Boolean)),
       schemaTypesDetected: Array.from(new Set(crawl.pages.flatMap((page) => page.schemaTypes))).sort(),
+      schemaDetection: aggregateSchemaDetection(crawl),
       aiCrawlerAccess: crawl.technicalFindings.robotsTxt.aiCrawlerAccess,
     },
+  };
+}
+
+function aggregateSchemaDetection(crawl: GeoCrawlResult): SchemaDetectionResult {
+  const pages = crawl.pages;
+  const schemaTypes = Array.from(new Set(pages.flatMap((page) => page.schemaDetection.schemaTypes))).sort();
+  const invalidSchemaWarnings = pages.flatMap((page) =>
+    page.schemaDetection.invalidSchemaWarnings.map((warning) => `${shortUrl(page.url)}: ${warning}`)
+  );
+  const incompleteFields = pages.flatMap((page) =>
+    page.schemaDetection.incompleteFields.map((warning) => `${shortUrl(page.url)}: ${warning}`)
+  );
+  const missingRecommendedSchema = Array.from(new Set(pages.flatMap((page) => page.schemaDetection.missingRecommendedSchema))).sort();
+  const recommendations = Array.from(new Set(pages.flatMap((page) => page.schemaDetection.recommendations))).slice(0, 8);
+  const hasType = (type: keyof Pick<SchemaDetectionResult, "faqSchema" | "organizationSchema" | "productSchema" | "localBusinessSchema" | "breadcrumbSchema" | "articleSchema" | "websiteSchema" | "serviceSchema" | "personSchema" | "reviewSchema" | "aggregateRatingSchema">) =>
+    pages.some((page) => page.schemaDetection[type]);
+
+  return {
+    schemaDetected: pages.some((page) => page.schemaDetection.schemaDetected),
+    schemaTypes,
+    schemaCount: pages.reduce((sum, page) => sum + page.schemaDetection.schemaCount, 0),
+    faqSchema: hasType("faqSchema"),
+    organizationSchema: hasType("organizationSchema"),
+    productSchema: hasType("productSchema"),
+    localBusinessSchema: hasType("localBusinessSchema"),
+    breadcrumbSchema: hasType("breadcrumbSchema"),
+    articleSchema: hasType("articleSchema"),
+    websiteSchema: hasType("websiteSchema"),
+    serviceSchema: hasType("serviceSchema"),
+    personSchema: hasType("personSchema"),
+    reviewSchema: hasType("reviewSchema"),
+    aggregateRatingSchema: hasType("aggregateRatingSchema"),
+    jsonLdBlocks: pages.reduce((sum, page) => sum + page.schemaDetection.jsonLdBlocks, 0),
+    jsonLdValidBlocks: pages.reduce((sum, page) => sum + page.schemaDetection.jsonLdValidBlocks, 0),
+    jsonLdInvalidBlocks: pages.reduce((sum, page) => sum + page.schemaDetection.jsonLdInvalidBlocks, 0),
+    microdataItems: pages.reduce((sum, page) => sum + page.schemaDetection.microdataItems, 0),
+    rdfaItems: pages.reduce((sum, page) => sum + page.schemaDetection.rdfaItems, 0),
+    invalidSchemaWarnings: invalidSchemaWarnings.slice(0, 12),
+    incompleteFields: incompleteFields.slice(0, 12),
+    missingRecommendedSchema,
+    recommendations,
   };
 }
 
