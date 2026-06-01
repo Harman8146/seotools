@@ -205,7 +205,7 @@ export default function Home() {
                 <Search size={15} aria-hidden="true" />
                 SEARCH QUERY
               </label>
-              <input className="form-control form-control-lg seo-input" placeholder="Enter keyword (e.g. Flower Delivery)" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
+              <input className="form-control form-control-lg seo-input" placeholder="Enter keyword" value={keyword} onChange={(e) => setKeyword(e.target.value)} />
             </div>
 
             <div className="mb-4 position-relative">
