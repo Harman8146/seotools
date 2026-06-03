@@ -112,9 +112,9 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* <div className="container position-relative pb-5" style={{ maxWidth: "1040px", zIndex: 1 }}>
-        {/* HEADER SECTION (SEO H1) 
-        <motion.header
+      <div className="container position-relative pb-5" style={{ maxWidth: "1040px", zIndex: 1 }}>
+        {/* HEADER SECTION (SEO H1) */}
+        {/* <motion.header
           className="seo-hero-shell text-center text-lg-start mb-5"
           initial={{ opacity: 0, y: 26 }}
           animate={{ opacity: 1, y: 0 }}
