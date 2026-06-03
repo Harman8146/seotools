@@ -333,7 +333,7 @@ export default function GeoPage() {
     <main className="geo-premium-page container-fluid px-3 px-sm-4 py-4 py-md-5 text-dark dark:text-light">
       <div className="premium-aurora" aria-hidden="true" />
       <div className="container" style={{ maxWidth: "980px" }}>
-        <header className="geo-hero-shell mb-5">
+        {/* <header className="geo-hero-shell mb-5">
           <Link href="/" className="text-decoration-none small fw-semibold text-primary">
             Back to SEO GEO Platform
           </Link>
@@ -350,7 +350,12 @@ export default function GeoPage() {
               </p>
             </div>
           </div>
-        </header>
+        </header> */}
+
+         <h1 className="display-5 fw-bold mt-3 mb-3">Generative Engine Optimization Analyzer</h1>
+        <p className="lead opacity-75 mb-0">
+                Audit how clearly AI search systems can crawl, understand, and cite your website.
+              </p>
 
         <section className="card border-0 shadow-sm mb-4" style={{ borderRadius: "20px" }}>
           <div className="card-body p-4 p-md-5">
